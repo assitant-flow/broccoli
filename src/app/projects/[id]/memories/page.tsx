@@ -19,6 +19,8 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [trace, setTrace] = useState<{ title: string; impacted: Impact[] } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [prefs, setPrefs] = useState<{ id: string; content: string }[]>([]);
+  const [prefDraft, setPrefDraft] = useState("");
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -28,9 +30,43 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
     if (!id) return;
     const load = () => api<{ items: Item[]; proposals: Proposal[] }>(`/api/projects/${id}/memories`).then((d) => { setItems(d.items); setProposals(d.proposals); }).catch(() => {});
     load();
+    const loadPrefs = () => api<{ id: string; content: string }[]>("/api/user/preferences").then(setPrefs).catch(() => {});
+    loadPrefs();
     const t = setInterval(load, 3500);
-    return () => clearInterval(t);
+    const t2 = setInterval(loadPrefs, 5000);
+    return () => {
+      clearInterval(t);
+      clearInterval(t2);
+    };
   }, [id]);
+
+  async function writeBack() {
+    setBusy(true);
+    try {
+      const res = await api<{ ok: boolean; message: string }>(`/api/projects/${id}/memories/write-back`, { method: "POST" });
+      alert(res.message);
+    } catch (e) {
+      alert(String((e as Error).message));
+    } finally { setBusy(false); }
+  }
+
+  async function addPref() {
+    if (!prefDraft.trim()) return;
+    setBusy(true);
+    try {
+      await api("/api/user/preferences", { method: "POST", body: JSON.stringify({ content: prefDraft }) });
+      setPrefDraft("");
+      setPrefs(await api<{ id: string; content: string }[]>("/api/user/preferences"));
+    } finally { setBusy(false); }
+  }
+
+  async function delPref(id2: string) {
+    setBusy(true);
+    try {
+      await api(`/api/user/preferences?id=${id2}`, { method: "DELETE" });
+      setPrefs((p) => p.filter((x) => x.id !== id2));
+    } finally { setBusy(false); }
+  }
 
   async function confirmProposal(pid: string) {
     setBusy(true);
@@ -90,8 +126,32 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
         </div>
         <div className="acts">
           <a className="btn btn-ghost" href={`/api/projects/${id}/memories/export`} download><I name="i-arrow" size={14} />导出 Markdown</a>
+          <button className="btn btn-ghost" disabled={busy} onClick={writeBack} title="将已确认记忆生成为仓库 CLAUDE.md 并提交到 main（FR-G9）"><I name="i-arrow" size={14} />写回仓库</button>
           <button className="btn btn-primary" disabled={busy || pending.length === 0} onClick={confirmAll}>批量确认 {pending.length} 条<I name="i-check" size={14} /></button>
         </div>
+
+        <div className="shell" style={{ marginBottom: 22 }}><div className="core" style={{ padding: "14px 18px" }}>
+          <div className="sec-hd" style={{ marginBottom: 8 }}>
+            <span className="t" style={{ fontSize: 13 }}>个人偏好（跨项目注入，v2α · FR-G10）</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <input
+              value={prefDraft}
+              onChange={(e) => setPrefDraft(e.target.value)}
+              placeholder="如：commit 信息使用中文；不做过度设计…"
+              style={{ flex: 1, height: 34, borderRadius: 12, border: "1px solid var(--line-2)", background: "rgba(255,255,255,.04)", padding: "0 12px", fontSize: 12, outline: "none" }}
+            />
+            <button className="btn btn-ghost btn-sm" disabled={busy || !prefDraft.trim()} onClick={addPref}>添加</button>
+          </div>
+          {prefs.map((p) => (
+            <div key={p.id} className="tl-row">
+              <span className="chip chip-blue" style={{ height: 22, fontSize: 10 }}>偏好</span>
+              <span className="tx">{p.content}</span>
+              <button className="ico-btn" onClick={() => delPref(p.id)}><I name="i-trash" size={13} /></button>
+            </div>
+          ))}
+          {prefs.length === 0 && <div style={{ fontSize: 11.5, color: "var(--txt-3)", fontWeight: 500 }}>暂无个人偏好 —— 将注入你所有项目的任务上下文</div>}
+        </div></div>
       </div>
 
       {pending.length > 0 && (

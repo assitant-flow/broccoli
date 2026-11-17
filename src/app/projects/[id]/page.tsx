@@ -10,7 +10,7 @@ type Project = {
   id: string; name: string; repoFullName: string; defaultBranch: string; failurePolicy: string;
   lastSuccessBranch: string | null; settings: { parallelStages?: boolean };
 };
-type Req = { id: string; seq: number; title: string; status: string; latestRunId: string | null };
+type Req = { id: string; seq: number; title: string; status: string; latestRunId: string | null; dependsOnSeq: number | null; skipReason: string | null };
 type Run = { id: string; requirementId: string; state: string; currentStage: string | null; error: string | null; startedAt: string | null; endedAt: string | null };
 type Pr = { id: string; number: number; title: string; branch: string; baseBranch: string; diffStat: string; status: string };
 type Issue = { id: string; number: number; title: string; state: string; syncedRequirementId: string | null };
@@ -185,7 +185,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
           <div className="compose shell" ref={composeRef} style={{ marginBottom: 16 }}>
             <div className="core inner">
-              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={"每行一条需求，一次可提交多条：\n· 修复登录态过期后无限重定向的问题\n· 引入会话持久化存储，支持限流计数\n· 为 /api/orders 添加分页与筛选"} />
+              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={"每行一条需求，一次可提交多条：\n· 修复登录态过期后无限重定向的问题\n· 引入会话持久化存储，支持限流计数\n· @2 在会话存储就绪后新增限流中间件（@N = 依赖需求 #N，依赖图 v2α）"} />
               <div className="ft">
                 <span className="hint"><I name="i-alert" size={13} />失败时：{policy === "pause" ? "暂停队列并邮件通知你" : "自动跳过并继续后续需求"}</span>
                 <div className="seg">
@@ -212,6 +212,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <span className="no">#{r.seq}</span>
                     <span className="ttl">{r.title}</span>
                     <div className="meta-r">
+                      {r.dependsOnSeq && <span className="chip chip-gray" title="依赖图（v2α）：该需求完成后才启动">依赖 #{r.dependsOnSeq}</span>}
                       <span className={`chip ${chip.cls}`}>{isActive ? (run?.state === "wait_confirm" ? "等待确认" : run?.state === "preparing" ? "环境准备" : `执行中 · ${run?.currentStage ?? ""}`) : chip.label}</span>
                       {r.status === "queued" && (
                         <>
@@ -251,6 +252,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <div className="exp">
                       <span className="cn-ic" style={{ background: "var(--red-dim)", color: "var(--red)" }}><I name="i-alert" size={14} /></span>
                       <div className="tx"><b>失败原因：</b>{run.error}</div>
+                    </div>
+                  )}
+                  {r.status === "skipped" && r.skipReason && (
+                    <div className="exp">
+                      <span className="cn-ic" style={{ background: "rgba(255,255,255,.06)", color: "var(--txt-2)" }}><I name="i-alert" size={14} /></span>
+                      <div className="tx"><b>跳过原因：</b>{r.skipReason}</div>
                     </div>
                   )}
                   {r.status === "done" && run && (

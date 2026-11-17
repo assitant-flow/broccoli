@@ -81,6 +81,10 @@ export const requirements = pgTable(
     description: text("description").notNull().default(""),
     status: text("status").notNull().default("queued"),
     latestRunId: uuid("latest_run_id"),
+    /** 依赖图（v2α）：依赖同项目内某需求的 seq；该需求 done 后才启动，失败/跳过则级联跳过 */
+    dependsOnSeq: integer("depends_on_seq"),
+    /** 级联跳过原因（依赖图/失败策略） */
+    skipReason: text("skip_reason"),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },
   (t) => [index("requirements_project_idx").on(t.projectId, t.seq)],
@@ -254,7 +258,10 @@ export const memoryItems = pgTable(
   "memory_items",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    projectId: uuid("project_id").notNull(),
+    /** 项目级记忆；用户级偏好（v2α）时为空，改以 user_id 归属 */
+    projectId: uuid("project_id"),
+    /** 用户级偏好记忆（v2α，FR-G10）：非空时跨该项目所有者的全部项目注入 */
+    userId: uuid("user_id"),
     type: text("type").notNull().default("decision"),
     content: text("content").notNull(),
     status: text("status").notNull().default("confirmed"),
@@ -263,7 +270,7 @@ export const memoryItems = pgTable(
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
-  (t) => [index("memory_items_project_idx").on(t.projectId, t.status)],
+  (t) => [index("memory_items_project_idx").on(t.projectId, t.status), index("memory_items_user_idx").on(t.userId)],
 );
 
 export const memoryInjections = pgTable("memory_injections", {

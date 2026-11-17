@@ -134,6 +134,29 @@ export async function startQueuedRuns(): Promise<number> {
       if (blocked > 0) continue;
     }
 
+    // 依赖图（v2α）：依赖未完成 → 保持排队；依赖失败/跳过/取消 → 级联跳过（FR-D6 语义扩展）
+    if (requirement.dependsOnSeq) {
+      const [dep] = await db
+        .select()
+        .from(requirements)
+        .where(and(eq(requirements.projectId, project.id), eq(requirements.seq, requirement.dependsOnSeq)))
+        .limit(1);
+      if (dep) {
+        if (["failed", "skipped", "cancelled"].includes(dep.status)) {
+          await db
+            .update(requirements)
+            .set({
+              status: "skipped",
+              skipReason: `依赖 #${dep.seq}（${dep.title.slice(0, 20)}）状态为 ${dep.status === "failed" ? "失败" : dep.status}，级联跳过（依赖图 v2α）`,
+            })
+            .where(eq(requirements.id, requirement.id));
+          await cancelRun(run.id);
+          continue;
+        }
+        if (dep.status !== "done") continue;
+      }
+    }
+
     // 用户并发槽位（AC-D1）
     const [{ count: leases }] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -188,11 +211,20 @@ export async function startQueuedRuns(): Promise<number> {
       .select()
       .from(memoryProposals)
       .where(and(eq(memoryProposals.projectId, project.id), eq(memoryProposals.status, "pending")));
-    const injections = [...items.map((i) => `【记忆·${i.type}】${i.content}`), ...proposals.map((p) => `【提案·${p.type}】${p.content}`)];
+    // 用户级偏好记忆（v2α，FR-G10）：跨项目注入
+    const userPrefs = await db
+      .select()
+      .from(memoryItems)
+      .where(and(eq(memoryItems.userId, project.userId), eq(memoryItems.status, "confirmed")));
+    const injections = [
+      ...userPrefs.map((i) => `【个人偏好】${i.content}`),
+      ...items.map((i) => `【记忆·${i.type}】${i.content}`),
+      ...proposals.map((p) => `【提案·${p.type}】${p.content}`),
+    ];
     // 仓库约定文件协同（FR-G8）：加载 CLAUDE.md 并注入上下文
     const claudeMd = await readRepoFile(project.id, "CLAUDE.md");
     if (claudeMd?.trim()) injections.push(`【仓库约定·CLAUDE.md】${claudeMd.trim().slice(0, 400)}`);
-    for (const item of items) {
+    for (const item of [...userPrefs, ...items]) {
       await db.insert(memoryInjections).values({ itemId: item.id, targetRunId: run.id });
     }
     for (const p of proposals) {

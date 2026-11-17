@@ -27,9 +27,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .from(requirements)
     .where(eq(requirements.projectId, id));
 
+  // 依赖图语法（v2α）：行首 "@N " 表示依赖需求 #N
+  const parsed = titles.map((t) => {
+    const m = t.match(/^@(\d+)\s+(.*)$/);
+    return m
+      ? { title: m[2], dependsOnSeq: Number(m[1]) }
+      : { title: t, dependsOnSeq: null as number | null };
+  });
+
   const rows = await db
     .insert(requirements)
-    .values(titles.map((t, i) => ({ projectId: id, batchId: batch.id, seq: max + i + 1, title: t })))
+    .values(parsed.map((p, i) => ({ projectId: id, batchId: batch.id, seq: max + i + 1, title: p.title, dependsOnSeq: p.dependsOnSeq })))
     .returning();
   // 提交即建 TaskRun（排队中），调度器按串行/并发约束启动
   for (const r of rows) {

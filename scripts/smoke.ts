@@ -46,7 +46,7 @@ async function waitFor(desc: string, fn: () => Promise<boolean>, timeoutMs = 240
   return false;
 }
 
-type Req = { id: string; seq: number; title: string; status: string; latestRunId: string | null };
+type Req = { id: string; seq: number; title: string; status: string; latestRunId: string | null; dependsOnSeq: number | null; skipReason: string | null };
 type Run = { id: string; requirementId: string; state: string; currentStage: string | null; error: string | null; baseBranch: string | null };
 type ProjectData = { project: { id: string; name: string; lastSuccessBranch: string | null }; requirements: Req[]; runs: Run[]; prs: { id: string; number: number; baseBranch: string; branch: string; diffStat: string }[] };
 
@@ -227,9 +227,48 @@ async function main() {
   check("项目设置：默认分支 + 环境变量（FR-B3）", projAfter.data.project.defaultBranch === "main" && projAfter.data.project.settings?.env?.API_KEY === "secret-1", JSON.stringify(projAfter.data.project?.settings ?? projAfter.data).slice(0, 160));
   void patchRes;
 
+  // 20. 依赖图（v2α）：@N 语法声明依赖 → 依赖失败 → 级联跳过
+  await http(`/api/projects/${projB.id}/requirements`, "POST", {
+    items: ["@3 [fail-tests] 依赖失败级联示范", "@4 普通后续需求"],
+  });
+  const depOk = await waitFor("依赖需求失败 → 级联跳过后续", async () => {
+    const d = await B();
+    const r4 = d.requirements.find((r) => r.seq === 4)!;
+    const r5 = d.requirements.find((r) => r.seq === 5)!;
+    return r4.status === "failed" && r5.status === "skipped" && !!r5.skipReason;
+  }, 240000);
+  const bDep = await B();
+  const r5 = bDep.requirements.find((r) => r.seq === 5)!;
+  check("依赖图：@N 语法 + 失败级联跳过（v2α）", depOk, r5.skipReason?.slice(0, 60));
+
+  // 21. 记忆写回仓库（FR-G9 后半）：确认记忆 → CLAUDE.md → 提交 main
+  await http(`/api/projects/${projB.id}/memories`, "POST", {}); // 批量确认 B 的提案
+  const wb = await http<{ ok: boolean; message: string }>(`/api/projects/${projB.id}/memories/write-back`, "POST");
+  check("记忆写回仓库 CLAUDE.md（FR-G9）", wb.data.ok === true, wb.data.message);
+  const bProjId = projB.id;
+  const claudeMd = (() => { try { return fs.readFileSync(path.join(process.cwd(), ".data", "repos", bProjId, "work", "CLAUDE.md"), "utf8"); } catch { return ""; } })();
+  check("写回内容真实落库（CLAUDE.md in origin main）", claudeMd.includes("Broccoli 记忆写回"));
+
+  // 22. 用户级偏好记忆（v2α FR-G10）：跨项目注入
+  await http("/api/user/preferences", "POST", { content: "跨项目偏好：commit 信息使用中文" });
+  const prefs = await http<{ content: string }[]>("/api/user/preferences", "GET");
+  check("用户偏好保存（FR-G10）", prefs.data.some((p) => p.content.includes("commit 信息使用中文")));
+  const lab = await http<{ id: string }>("/api/projects", "POST", { name: "prefs-lab" });
+  await http(`/api/projects/${lab.data.id}/requirements`, "POST", { items: ["新增示例端点 /ping"] });
+  let labRunId = "";
+  await waitFor("偏好注入项目完成一个任务", async () => {
+    const d = await http<ProjectData>(`/api/projects/${lab.data.id}`, "GET").then((r) => r.data!);
+    const run = d.runs.find((r) => r.requirementId === d.requirements[0].id);
+    if (run?.state === "completed") { labRunId = run.id; return true; }
+    return false;
+  }, 180000);
+  const labCanvas = await http<{ run: { snapshot: { injections?: string[] } | null } }>(`/api/runs/${labRunId}`, "GET");
+  check("个人偏好跨项目注入（FR-G10）", (labCanvas.data.run.snapshot?.injections ?? []).some((s) => s.includes("跨项目偏好")));
+  await http(`/api/projects/${lab.data.id}`, "DELETE");
+
   console.log("\n========================================");
   if (failures === 0) {
-    console.log("✅ 全部检查通过 —— MVP 全部功能（P0 + P1）端到端可用");
+    console.log("✅ 全部检查通过 —— MVP 全部功能（P0 + P1）+ 迭代 v2α 端到端可用");
   } else {
     console.log(`❌ ${failures} 项检查失败`);
   }
