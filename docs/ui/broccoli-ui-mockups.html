@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Broccoli · UI 设计稿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============ tokens ============ */
+:root{
+  --bg:#050507; --bg-soft:#0a0c0b; --bg-core:#0b0e0c;
+  --panel:rgba(255,255,255,.035); --panel-2:rgba(255,255,255,.06);
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.15);
+  --txt:#f2f5f3; --txt-2:rgba(242,245,243,.6); --txt-3:rgba(242,245,243,.36);
+  --acc:#34d399; --acc-deep:#10b981; --acc-dim:rgba(52,211,153,.14);
+  --amber:#fbbf24; --amber-dim:rgba(251,191,36,.12); --amber-line:rgba(251,191,36,.28);
+  --red:#f87171; --red-dim:rgba(248,113,113,.1); --red-line:rgba(248,113,113,.26);
+  --blue:#7dd3fc; --blue-dim:rgba(125,211,252,.1);
+  --ease:cubic-bezier(.32,.72,0,1);
+  --r-shell:26px; --r-core:20px;
+  --sans:"Plus Jakarta Sans","PingFang SC","Hiragino Sans GB",sans-serif;
+  --mono:"JetBrains Mono","SF Mono",Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+button{background:none;border:none;color:inherit;font:inherit;cursor:pointer;padding:0}
+html{background:#020203}
+body{font-family:var(--sans);color:var(--txt);background:#020203;-webkit-font-smoothing:antialiased}
+::selection{background:rgba(52,211,153,.25)}
+
+/* fixed ambience */
+.orbs{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(52rem 40rem at 12% -6%, rgba(16,185,129,.13), transparent 62%),
+    radial-gradient(46rem 36rem at 96% 12%, rgba(125,211,252,.07), transparent 60%),
+    radial-gradient(40rem 34rem at 55% 108%, rgba(16,185,129,.06), transparent 62%);}
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");}
+
+/* page frame */
+.stage{position:relative;z-index:2;padding:72px 0 40px}
+.frame{margin:0 auto 88px;max-width:1568px;padding:0 64px}
+.frame-label{display:flex;align-items:baseline;gap:14px;margin:0 0 18px 4px}
+.frame-label .no{font-family:var(--mono);font-size:11px;letter-spacing:.28em;color:var(--acc);font-weight:600}
+.frame-label .name{font-size:15px;font-weight:700;letter-spacing:.02em}
+.frame-label .desc{font-size:12px;color:var(--txt-3);margin-left:2px}
+.screen{width:1440px;margin:0 auto;background:var(--bg);border:1px solid var(--line);border-radius:30px;
+  overflow:hidden;box-shadow:0 40px 120px -30px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.06)}
+
+/* ============ primitives ============ */
+.shell{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-shell);padding:8px}
+.core{background:var(--bg-core);border-radius:calc(var(--r-shell) - 7px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);height:100%}
+.card-plain{background:var(--panel);border:1px solid var(--line);border-radius:22px}
+
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px;border-radius:999px;
+  font-size:11.5px;font-weight:600;letter-spacing:.02em;border:1px solid transparent;white-space:nowrap}
+.chip .i{width:13px;height:13px}
+.chip-gray{color:var(--txt-2);background:rgba(255,255,255,.05);border-color:var(--line)}
+.chip-green{color:var(--acc);background:var(--acc-dim);border-color:rgba(52,211,153,.3)}
+.chip-amber{color:var(--amber);background:var(--amber-dim);border-color:var(--amber-line)}
+.chip-red{color:var(--red);background:var(--red-dim);border-color:var(--red-line)}
+.chip-blue{color:var(--blue);background:var(--blue-dim);border-color:rgba(125,211,252,.28)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
+.dot.pulse{box-shadow:0 0 0 0 rgba(255,255,255,.18);animation:pu 2.2s var(--ease) infinite}
+@keyframes pu{0%{box-shadow:0 0 0 0 rgba(255,255,255,.22)}70%{box-shadow:0 0 0 7px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
+
+.btn{display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 8px 0 20px;border-radius:999px;
+  font-size:13px;font-weight:700;border:1px solid transparent;cursor:pointer;
+  transition:all .5s var(--ease);white-space:nowrap}
+.btn .bi{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.btn .bi .i{width:14px;height:14px}
+.btn-primary{background:linear-gradient(180deg,#2ee9a8,#17b98a);color:#04150d;box-shadow:0 6px 22px -6px rgba(16,185,129,.45)}
+.btn-primary .bi{background:rgba(4,21,13,.14)}
+.btn-ghost{background:rgba(255,255,255,.05);color:var(--txt);border-color:var(--line);padding:0 18px}
+.btn-ghost:hover{background:rgba(255,255,255,.09)}
+.btn-sm{height:32px;font-size:12px;padding:0 5px 0 14px}
+.btn-sm .bi{width:22px;height:22px}
+.btn-sm .bi .i{width:12px;height:12px}
+.btn-amber{background:linear-gradient(180deg,#fcd34d,#f59e0b);color:#1c1204;box-shadow:0 6px 22px -6px rgba(245,158,11,.4)}
+.btn-amber .bi{background:rgba(28,18,4,.14)}
+.btn-red-g{background:rgba(248,113,113,.12);color:var(--red);border-color:var(--red-line)}
+.i{width:16px;height:16px;stroke-width:1.5;flex:none}
+
+.ico-btn{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;
+  color:var(--txt-3);border:1px solid transparent;transition:all .4s var(--ease)}
+.ico-btn:hover{color:var(--txt);background:rgba(255,255,255,.06)}
+
+.seg{display:inline-flex;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg span{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;color:var(--txt-3)}
+.seg .on{background:rgba(255,255,255,.1);color:var(--txt);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+
+.toggle{width:34px;height:20px;border-radius:999px;background:rgba(255,255,255,.12);position:relative;flex:none}
+.toggle::after{content:"";position:absolute;top:2.5px;left:3px;width:15px;height:15px;border-radius:50%;background:#cfd6d2}
+.toggle.on{background:var(--acc-deep)}
+.toggle.on::after{left:16px;background:#eafff6}
+
+.progress{height:5px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;position:relative}
+.progress b{position:absolute;inset:0;right:auto;border-radius:999px;background:linear-gradient(90deg,#0e9f76,#34d399)}
+.progress.amber b{background:linear-gradient(90deg,#b45309,#fbbf24)}
+.progress.red b{background:linear-gradient(90deg,#b91c1c,#f87171)}
+
+/* ============ app shell ============ */
+.app{display:flex;min-height:1060px}
+.side{width:248px;flex:none;border-right:1px solid var(--line);padding:26px 18px;display:flex;flex-direction:column;gap:6px;
+  background:linear-gradient(180deg,rgba(16,185,129,.05),transparent 30%)}
+.logo{display:flex;align-items:center;gap:11px;padding:4px 8px 20px}
+.logo .mark{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,#0fae7e,#065f46);
+  display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px -4px rgba(16,185,129,.5), inset 0 1px 0 rgba(255,255,255,.25)}
+.logo .mark .i{width:19px;height:19px;stroke-width:1.8;color:#eafff6}
+.logo .nm{font-size:16.5px;font-weight:800;letter-spacing:.01em}
+.logo .tag{font-size:9px;font-weight:700;letter-spacing:.22em;color:var(--acc);display:block;margin-top:2px}
+.nav-item{display:flex;align-items:center;gap:12px;height:42px;padding:0 12px;border-radius:14px;color:var(--txt-2);
+  font-size:13.5px;font-weight:600;transition:all .4s var(--ease)}
+.nav-item .i{width:17px;height:17px}
+.nav-item .cnt{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--txt-3)}
+.nav-item.on{color:var(--txt);background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.nav-item.on .i{color:var(--acc)}
+.side .foot{margin-top:auto;padding:12px;display:flex;align-items:center;gap:11px;border-radius:16px;background:var(--panel);border:1px solid var(--line)}
+.side .foot .av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#22c55e,#065f46);flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#eafff6}
+.side .foot .nm{font-size:12.5px;font-weight:700}
+.side .foot .st{font-size:10.5px;color:var(--acc);display:flex;align-items:center;gap:5px;margin-top:2px}
+
+.main{flex:1;min-width:0;padding:26px 34px 34px}
+.topbar{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+.topbar .hi{font-size:19px;font-weight:800;letter-spacing:.01em}
+.topbar .dt{font-size:12.5px;color:var(--txt-3);margin-top:3px;font-weight:500}
+.topbar .sp{flex:1}
+.search{display:flex;align-items:center;gap:9px;height:38px;padding:0 16px;border-radius:999px;background:var(--panel);
+  border:1px solid var(--line);color:var(--txt-3);font-size:12.5px;width:230px}
+.search .i{width:14px;height:14px}
+.mail-dot{position:relative}
+.mail-dot::after{content:"";position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--amber);border:2px solid var(--bg)}
+
+/* ============ S1 dashboard ============ */
+.alerts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
+.alert{border-radius:var(--r-shell);padding:8px}
+.alert .inner{border-radius:calc(var(--r-shell) - 7px);padding:18px 20px;border:1px solid;position:relative}
+.alert .inner::before{content:"";position:absolute;inset:0;border-radius:inherit;opacity:.5;pointer-events:none}
+.alert.amber .inner{background:linear-gradient(135deg,rgba(251,191,36,.09),rgba(251,191,36,.03) 55%),var(--bg-core);border-color:var(--amber-line);
+  box-shadow:0 10px 40px -18px rgba(251,191,36,.35)}
+.alert.red .inner{background:linear-gradient(135deg,rgba(248,113,113,.08),rgba(248,113,113,.02) 55%),var(--bg-core);border-color:var(--red-line);
+  box-shadow:0 10px 40px -18px rgba(248,113,113,.3)}
+.alert .hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.alert .ttl{font-size:14.5px;font-weight:800;margin-bottom:6px}
+.alert .q{font-size:13px;color:var(--txt-2);line-height:1.55;font-weight:500}
+.alert .q code{font-family:var(--mono);font-size:12px;color:var(--amber);background:rgba(251,191,36,.08);padding:1px 6px;border-radius:6px}
+.alert .ft{display:flex;align-items:center;gap:12px;margin-top:16px}
+.alert .meta{font-size:11.5px;color:var(--txt-3);font-weight:500}
+.alert .acts{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+.stats{display:flex;gap:12px;margin-bottom:22px}
+.stat{flex:1;display:flex;align-items:center;gap:13px;padding:15px 18px;border-radius:20px;background:var(--panel);border:1px solid var(--line)}
+.stat .ic{width:38px;height:38px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.stat .v{font-size:21px;font-weight:800;font-family:var(--mono);letter-spacing:-.02em}
+.stat .l{font-size:11.5px;color:var(--txt-3);font-weight:600;margin-top:1px}
+.stat .ic.green{background:var(--acc-dim);color:var(--acc)}
+.stat .ic.amber{background:var(--amber-dim);color:var(--amber)}
+.stat .ic.red{background:var(--red-dim);color:var(--red)}
+.stat .ic.blue{background:var(--blue-dim);color:var(--blue)}
+.stat .ic.gray{background:rgba(255,255,255,.06);color:var(--txt-2)}
+
+.bento{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.b7{grid-column:span 7}.b5{grid-column:span 5}.b12{grid-column:span 12}
+.pcard .inner{padding:20px 22px 18px}
+.pcard .hd{display:flex;align-items:center;gap:11px;margin-bottom:16px}
+.pcard .hd .repo-i{width:34px;height:34px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;color:var(--txt-2)}
+.pcard .rname{font-size:14.5px;font-weight:800;font-family:var(--mono);letter-spacing:-.01em}
+.pcard .rmeta{font-size:11px;color:var(--txt-3);margin-top:3px;display:flex;gap:8px;align-items:center;font-weight:500}
+.prow{display:flex;align-items:center;gap:10px;margin:10px 0 14px}
+.prow .num{font-family:var(--mono);font-size:11px;color:var(--txt-2);font-weight:600;white-space:nowrap}
+.prow .bar{flex:1}
+.qdots{display:flex;gap:5px}
+.qdots i{width:22px;height:5px;border-radius:999px;background:rgba(255,255,255,.1)}
+.qdots i.done{background:var(--acc-deep)}
+.qdots i.wait{background:var(--amber)}
+.qdots i.run{background:var(--acc);animation:gl 1.8s var(--ease) infinite}
+@keyframes gl{0%,100%{opacity:1}50%{opacity:.35}}
+.qdots i.fail{background:var(--red)}
+.pcard .cur{margin-top:14px;padding:11px 13px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid var(--line);
+  font-size:12.5px;color:var(--txt-2);display:flex;align-items:center;gap:10px;font-weight:500}
+.pcard .ft{display:flex;align-items:center;margin-top:14px;gap:8px}
+.pcard .ft .meta{font-size:11.5px;color:var(--txt-3);font-weight:500}
+.pcard .ft .sp{flex:1}
+
+.tl{padding:6px 22px 16px}
+.tl-row{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px dashed rgba(255,255,255,.07);font-size:12.5px}
+.tl-row:last-child{border-bottom:none}
+.tl-row .t{font-family:var(--mono);font-size:11px;color:var(--txt-3);width:48px;flex:none}
+.tl-row .tx{color:var(--txt-2);font-weight:500}
+.tl-row .tx b{color:var(--txt);font-weight:700}
+
+/* ============ S2 project / queue ============ */
+.crumb{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt-3);margin-bottom:14px;font-weight:600}
+.crumb .i{width:13px;height:13px}
+.crumb b{color:var(--txt-2)}
+.phd{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+.phd .repo-i{width:52px;height:52px;border-radius:17px;background:linear-gradient(135deg,rgba(16,185,129,.18),rgba(16,185,129,.05));
+  border:1px solid rgba(52,211,153,.25);display:flex;align-items:center;justify-content:center;color:var(--acc)}
+.phd .repo-i .i{width:24px;height:24px}
+.phd .rname{font-size:21px;font-weight:800;font-family:var(--mono);letter-spacing:-.02em}
+.phd .rmeta{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.phd .acts{margin-left:auto;display:flex;gap:10px}
+.split{display:grid;grid-template-columns:1fr 372px;gap:16px;align-items:start;margin-top:20px}
+.sec-hd{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.sec-hd .t{font-size:15.5px;font-weight:800}
+.sec-hd .sp{flex:1}
+
+.compose .inner{padding:18px 20px 16px}
+.compose .fake-input{border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);padding:14px 16px;
+  font-size:13px;line-height:1.9;color:var(--txt-2);font-weight:500}
+.compose .fake-input .cur-line{display:flex;align-items:center;gap:2px}
+.compose .caret{display:inline-block;width:2px;height:16px;background:var(--acc);vertical-align:-3px;animation:gl 1.2s var(--ease) infinite;margin-left:2px}
+.compose .fake-input b{color:var(--txt);font-weight:700}
+.compose .ft{display:flex;align-items:center;gap:12px;margin-top:14px}
+.compose .hint{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--txt-3);font-weight:500}
+.compose .ft .sp{flex:1}
+
+.queue{display:flex;flex-direction:column;gap:10px}
+.qrow{border-radius:20px;background:var(--panel);border:1px solid var(--line);padding:14px 16px;transition:all .4s var(--ease)}
+.qrow.run{border-color:rgba(52,211,153,.3);background:linear-gradient(135deg,rgba(16,185,129,.06),transparent 60%),var(--panel)}
+.qrow.wait{border-color:var(--amber-line);background:linear-gradient(135deg,rgba(251,191,36,.05),transparent 60%),var(--panel)}
+.qrow .r1{display:flex;align-items:center;gap:12px}
+.qrow .grip{color:var(--txt-3);font-family:var(--mono);font-size:13px;letter-spacing:-2px;flex:none}
+.qrow .no{font-family:var(--mono);font-size:12px;color:var(--txt-3);width:26px;flex:none;font-weight:600}
+.qrow .ttl{font-size:13.5px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qrow.done .ttl{color:var(--txt-2)}
+.qrow .meta-r{display:flex;align-items:center;gap:8px;flex:none}
+.qrow .exp{margin-top:12px;border-top:1px dashed var(--line);padding-top:12px;display:flex;gap:12px;align-items:flex-start}
+.qrow .exp .ic-big{width:34px;height:34px;border-radius:12px;background:var(--amber-dim);color:var(--amber);display:flex;align-items:center;justify-content:center;flex:none}
+.qrow .exp .tx{font-size:12.5px;color:var(--txt-2);line-height:1.6;font-weight:500;flex:1}
+.qrow .exp .tx b{color:var(--txt)}
+.mini-log{font-family:var(--mono);font-size:11px;line-height:1.8;background:#070908;border:1px solid var(--line);border-radius:12px;padding:10px 14px;color:var(--txt-2);margin-top:12px}
+.mini-log .g{color:var(--txt-3)} .mini-log .e{color:var(--acc)} .mini-log .w{color:var(--amber)}
+
+.rail{display:flex;flex-direction:column;gap:14px}
+.prchain .inner{padding:18px 20px}
+.pr-node{display:flex;gap:13px;position:relative;padding-bottom:18px}
+.pr-node:last-child{padding-bottom:2px}
+.pr-node::before{content:"";position:absolute;left:11px;top:26px;bottom:0;width:1.5px;background:var(--line-2)}
+.pr-node.last::before{display:none}
+.pr-node .pt{width:23px;height:23px;border-radius:50%;border:1.5px solid var(--line-2);background:var(--bg-core);
+  display:flex;align-items:center;justify-content:center;flex:none;font-family:var(--mono);font-size:9px;color:var(--txt-3);z-index:1;position:relative}
+.pr-node.done .pt{background:var(--acc-deep);border-color:var(--acc-deep);color:#04150d}
+.pr-node.pend .pt{border-style:dashed}
+.pr-node .pbody{flex:1;padding-top:1px}
+.pr-node .pn{font-family:var(--mono);font-size:12px;font-weight:600}
+.pr-node .pd{font-size:11.5px;color:var(--txt-3);margin-top:3px;font-weight:500;line-height:1.5}
+.pr-node .pd b{color:var(--txt-2)}
+.pr-node .pc{margin-top:6px}
+.memprev .inner{padding:16px 18px}
+.memprev .row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed rgba(255,255,255,.07);font-size:12.5px;font-weight:600}
+.memprev .row:last-child{border-bottom:none}
+.memprev .row .n{margin-left:auto;font-family:var(--mono);color:var(--txt-2);font-size:11.5px}
+.memprev .note{font-size:11.5px;color:var(--txt-3);line-height:1.6;margin-top:8px;font-weight:500}
+.memprev .note b{color:var(--txt-2)}
+.cbox .inner{padding:16px 18px}
+.cbox .r{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;padding:8px 0;font-weight:600;color:var(--txt-2)}
+.cbox .r .v{font-family:var(--mono);color:var(--txt);font-size:11.5px}
+
+/* ============ S3 task detail ============ */
+.task-hd{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px}
+.task-hd .ttl-h{font-size:21px;font-weight:800;margin-bottom:9px;letter-spacing:-.01em}
+.task-hd .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.task-hd .acts{margin-left:auto;display:flex;gap:9px}
+.confirm-card{border-radius:var(--r-shell);padding:9px;margin-bottom:20px}
+.confirm-card .inner{border-radius:calc(var(--r-shell) - 7px);padding:22px 24px;border:1px solid var(--amber-line);
+  background:linear-gradient(135deg,rgba(251,191,36,.08),rgba(251,191,36,.02) 45%),var(--bg-core);
+  box-shadow:0 16px 60px -24px rgba(251,191,36,.4)}
+.confirm-card .q-hd{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.confirm-card .q-hd .qi{width:34px;height:34px;border-radius:12px;background:var(--amber-dim);color:var(--amber);
+  display:flex;align-items:center;justify-content:center}
+.confirm-card .qt{font-size:15.5px;font-weight:800}
+.confirm-card .qq{font-size:13.5px;color:var(--txt-2);line-height:1.7;font-weight:500;max-width:980px}
+.opts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:18px}
+.opt{border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);padding:14px 16px;position:relative;transition:all .4s var(--ease)}
+.opt.sel{border-color:rgba(52,211,153,.5);background:linear-gradient(135deg,rgba(52,211,153,.1),rgba(52,211,153,.03));box-shadow:0 8px 30px -14px rgba(16,185,129,.4)}
+.opt .radio{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line-2);position:absolute;top:15px;right:15px}
+.opt.sel .radio{border-color:var(--acc)}
+.opt.sel .radio::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--acc)}
+.opt .ot{font-size:13.5px;font-weight:800;font-family:var(--mono);display:flex;align-items:center;gap:8px}
+.opt .rec{font-size:9.5px;font-weight:800;letter-spacing:.08em;color:var(--acc);background:var(--acc-dim);border:1px solid rgba(52,211,153,.3);
+  padding:2px 7px;border-radius:999px}
+.opt .od{font-size:11.5px;color:var(--txt-3);line-height:1.6;margin-top:7px;font-weight:500}
+.confirm-card .aft{display:flex;align-items:center;gap:12px;margin-top:18px}
+.confirm-card .aft .note{font-size:11.5px;color:var(--txt-3);display:flex;align-items:center;gap:7px;font-weight:500}
+.confirm-card .aft .sp{flex:1}
+.tabs{display:flex;gap:6px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:999px;padding:4px;width:max-content;margin-bottom:14px}
+.tabs span{padding:7px 16px;border-radius:999px;font-size:12.5px;font-weight:700;color:var(--txt-3)}
+.tabs .on{background:rgba(255,255,255,.1);color:var(--txt);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.termwrap{display:grid;grid-template-columns:1fr 380px;gap:16px;align-items:start}
+.term{font-family:var(--mono);font-size:12px;line-height:1.95;background:#070908;border:1px solid var(--line);border-radius:18px;padding:18px 22px;color:var(--txt-2)}
+.term .ts{color:var(--txt-3);margin-right:14px;font-size:11px}
+.term .ok{color:var(--acc)} .term .warn{color:var(--amber)} .term .dim{color:var(--txt-3)} .term .tx{color:var(--txt)}
+.term-bar{display:flex;align-items:center;gap:8px;padding:12px 18px;border-bottom:1px solid var(--line)}
+.term-bar .td{width:9px;height:9px;border-radius:50%}
+.term-bar .tt{font-family:var(--mono);font-size:11px;color:var(--txt-3);margin-left:8px}
+.file-list .inner{padding:14px 16px}
+.file-list .fh{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--txt-2);padding:4px 4px 10px;display:flex;align-items:center;gap:8px}
+.frow{display:flex;align-items:center;gap:9px;padding:9px 6px;border-radius:11px;font-family:var(--mono);font-size:11.5px;font-weight:500}
+.frow:hover{background:rgba(255,255,255,.04)}
+.frow .fn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt-2)}
+.frow .add{color:var(--acc);font-size:10.5px}.frow .del{color:var(--red);font-size:10.5px}
+.frow .new{font-size:9px;color:var(--blue);border:1px solid rgba(125,211,252,.3);border-radius:5px;padding:1px 5px;letter-spacing:.05em}
+.dstat{display:flex;gap:14px;padding:10px 6px 4px;font-family:var(--mono);font-size:11px;color:var(--txt-3)}
+.dstat b{color:var(--acc);font-weight:600}.dstat i{color:var(--red);font-style:normal;font-weight:600}
+.chat-sample{display:flex;flex-direction:column;gap:10px}
+.bub{max-width:76%;padding:11px 15px;border-radius:16px;font-size:12.5px;line-height:1.6;font-weight:500}
+.bub.a{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--txt-2);border-bottom-left-radius:6px}
+.bub.u{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:var(--txt);margin-left:auto;border-bottom-right-radius:6px}
+.bub .who{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--txt-3);margin-bottom:5px}
+.bub.u .who{color:var(--acc)}
+
+/* ============ S4 memory ============ */
+.mem-hd{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+.mem-hd .t{font-size:21px;font-weight:800}
+.mem-hd .cnts{display:flex;gap:8px}
+.mem-hd .acts{margin-left:auto;display:flex;gap:10px}
+.prop-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.prop .inner{padding:17px 18px;display:flex;flex-direction:column;gap:10px;height:100%}
+.prop .ph{display:flex;align-items:center;gap:8px}
+.prop .src{font-size:10.5px;color:var(--txt-3);margin-left:auto;font-family:var(--mono)}
+.prop .body{font-size:12.5px;line-height:1.7;color:var(--txt-2);font-weight:500;flex:1}
+.prop .body b{color:var(--txt)}
+.prop .inj{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt-3);font-weight:600;
+  padding:8px 11px;border-radius:11px;background:rgba(125,211,252,.06);border:1px dashed rgba(125,211,252,.22)}
+.prop .inj .i{width:13px;height:13px;color:var(--blue)}
+.prop .pa{display:flex;gap:8px;align-items:center}
+.mem-rows{display:flex;flex-direction:column;gap:8px}
+.mem-row{display:flex;align-items:center;gap:14px;padding:13px 18px;border-radius:16px;background:var(--panel);border:1px solid var(--line)}
+.mem-row .body{flex:1;min-width:0}
+.mem-row .tx{font-size:13px;font-weight:600}
+.mem-row .tx b{font-weight:800}
+.mem-row .mt{font-size:11px;color:var(--txt-3);margin-top:4px;font-family:var(--mono)}
+.mem-row.off{opacity:.55}
+.trace .inner{padding:20px 22px;border:1px solid var(--red-line);border-radius:calc(var(--r-shell) - 7px);
+  background:linear-gradient(135deg,rgba(248,113,113,.05),transparent 50%),var(--bg-core)}
+.trace .th{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.trace .tt{font-size:14.5px;font-weight:800}
+.trace .td{font-size:12.5px;color:var(--txt-2);line-height:1.6;margin-bottom:14px;font-weight:500}
+.trace .td b{color:var(--txt)}
+.trace-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:13px;background:rgba(248,113,113,.06);
+  border:1px solid rgba(248,113,113,.16);margin-bottom:8px;font-size:12.5px;font-weight:600}
+.trace-row .no{font-family:var(--mono);color:var(--txt-3);font-size:11px;width:24px}
+.trace-row .tt2{flex:1;color:var(--txt-2)}
+.trace-row .st{font-size:10.5px}
+
+/* ============ S5 onboarding ============ */
+.onb{min-height:1060px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 0;position:relative}
+.onb .logo{padding:0 0 8px;justify-content:center}
+.onb .hero{font-size:26px;font-weight:800;letter-spacing:-.01em;margin-bottom:8px;text-align:center}
+.onb .sub{font-size:13.5px;color:var(--txt-3);font-weight:500;margin-bottom:34px;text-align:center}
+.wizard{width:1020px;display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start}
+.steps{display:flex;align-items:center;gap:0;margin-bottom:18px;width:100%}
+.step{display:flex;align-items:center;gap:10px}
+.step .sn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line-2);display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--txt-3);flex:none;background:var(--bg-core)}
+.step.done .sn{background:var(--acc-deep);border-color:var(--acc-deep);color:#04150d}
+.step.cur .sn{border-color:var(--acc);color:var(--acc);box-shadow:0 0 0 5px rgba(52,211,153,.12)}
+.step .sl{font-size:12.5px;font-weight:700;color:var(--txt-3)}
+.step.done .sl,.step.cur .sl{color:var(--txt)}
+.step-line{flex:1;height:1.5px;background:var(--line-2);margin:0 16px;min-width:40px}
+.step-line.done{background:var(--acc-deep)}
+.keycard .inner{padding:24px 26px}
+.keycard .lbl{font-size:13px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.keyrow{display:flex;gap:10px;align-items:center}
+.key-input{flex:1;height:48px;border-radius:15px;border:1px solid var(--line-2);background:rgba(255,255,255,.04);
+  padding:0 18px;font-family:var(--mono);font-size:13.5px;color:var(--txt);display:flex;align-items:center;letter-spacing:.02em}
+.key-input .mask{color:var(--txt-2)}
+.key-ok{display:flex;align-items:center;gap:9px;margin-top:14px;padding:11px 15px;border-radius:13px;
+  background:var(--acc-dim);border:1px solid rgba(52,211,153,.3);font-size:12.5px;font-weight:700;color:var(--acc)}
+.key-ok .d{font-weight:500;color:var(--txt-2)}
+.sec-note{display:flex;gap:11px;margin-top:16px;padding:13px 15px;border-radius:14px;background:rgba(255,255,255,.03);
+  border:1px solid var(--line);font-size:11.5px;color:var(--txt-3);line-height:1.7;font-weight:500}
+.sec-note .i{width:15px;height:15px;color:var(--acc);margin-top:2px}
+.sec-note b{color:var(--txt-2)}
+.onb-ft{display:flex;align-items:center;gap:14px;margin-top:20px}
+.railcard .inner{padding:16px 18px}
+.railcard .rt{font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.railcard .rd{font-size:11.5px;color:var(--txt-3);line-height:1.7;font-weight:500}
+.railcard .rd b{color:var(--txt-2)}
+.railcard .chip{margin-top:10px}
+.expl{display:flex;flex-direction:column;gap:14px}
+.onb-note{font-size:11px;color:var(--txt-3);margin-top:18px;font-weight:500}
+
+/* ============ S6 执行画布 ============ */
+.cv-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.cv-toolbar .ttl{font-size:13.5px;font-weight:800}
+.cv-toolbar .sp{flex:1}
+.legend{display:flex;align-items:center;gap:14px;font-size:11px;color:var(--txt-3);font-weight:600}
+.legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
+.legend .lq{border-radius:3px;background:transparent;border:1.5px dashed var(--line-2);width:9px;height:9px}
+.zoom{display:inline-flex;align-items:center;gap:2px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:999px;padding:3px}
+.zoom span{padding:5px 12px;font-size:11.5px;font-weight:700;color:var(--txt-2);font-family:var(--mono)}
+.zoom .zc{min-width:26px;height:26px;border-radius:999px;padding:0 10px;display:flex;align-items:center;justify-content:center;color:var(--txt-3);white-space:nowrap;font-size:11px}
+.zoom .zc:hover{color:var(--txt)}
+.canvas-wrap{position:relative;height:644px;border-radius:calc(var(--r-shell) - 7px);overflow:hidden;
+  background:radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px) 0 0/24px 24px, #070908;border:1px solid var(--line)}
+.edges{position:absolute;inset:0;pointer-events:none}
+.edge{fill:none;stroke:rgba(255,255,255,.16);stroke-width:1.5}
+.edge.done{stroke:rgba(52,211,153,.4)}
+.edge.active{stroke:var(--acc);stroke-dasharray:6 6;animation:dashflow 1.1s linear infinite}
+@keyframes dashflow{to{stroke-dashoffset:-12}}
+.cnode{position:absolute;border-radius:16px;background:rgba(15,18,16,.96);border:1px solid var(--line-2);padding:13px 14px;box-shadow:0 12px 34px -20px rgba(0,0,0,.95)}
+.cnode.done{border-color:rgba(52,211,153,.4)}
+.cnode.run{border-color:rgba(52,211,153,.55);box-shadow:0 12px 44px -14px rgba(16,185,129,.5)}
+.cnode.wait{border-color:var(--amber-line);box-shadow:0 12px 44px -14px rgba(245,158,11,.42)}
+.cnode.queued{border-style:dashed;background:rgba(255,255,255,.02)}
+.cn-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cn-ic{width:26px;height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;background:rgba(255,255,255,.06);color:var(--txt-2)}
+.cn-ic .i{width:14px;height:14px}
+.cnode.run .cn-ic,.cnode.done .cn-ic{background:var(--acc-dim);color:var(--acc)}
+.cnode.wait .cn-ic{background:var(--amber-dim);color:var(--amber)}
+.cn-name{font-size:13px;font-weight:800;letter-spacing:.01em}
+.cn-chip{margin-left:auto;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:.04em;white-space:nowrap}
+.cn-chip.ok,.cn-chip.run{background:var(--acc-dim);color:var(--acc)}
+.cn-chip.warn{background:var(--amber-dim);color:var(--amber)}
+.cn-chip.q{background:rgba(255,255,255,.05);color:var(--txt-3)}
+.cn-model{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9.5px;font-weight:600;color:var(--blue);background:var(--blue-dim);border:1px solid rgba(125,211,252,.22);border-radius:999px;padding:2.5px 8px}
+.cn-meta{font-size:10px;color:var(--txt-3);font-family:var(--mono);margin-top:7px;font-weight:500}
+.cn-desc{font-size:11px;color:var(--txt-2);line-height:1.55;margin-top:7px;font-weight:500}
+.cn-art{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
+.cn-art span{font-size:9.5px;font-weight:600;color:var(--txt-2);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:7px;padding:3px 8px;white-space:nowrap}
+.cn-note{margin-top:9px;border-radius:10px;background:var(--amber-dim);border:1px dashed var(--amber-line);padding:8px 10px;font-size:10.5px;color:var(--amber);font-weight:700;display:flex;align-items:center;gap:7px}
+.cn-prog{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:10px;color:var(--txt-2);font-weight:600;white-space:nowrap}
+.cn-prog .bar{flex:1}
+.stage-pill{position:absolute;display:flex;align-items:center;gap:10px;border-radius:999px;background:rgba(15,18,16,.96);border:1px solid var(--line-2);padding:0 16px;height:52px;font-size:12px;font-weight:700;white-space:nowrap}
+.stage-pill .i{width:15px;height:15px;color:var(--acc)}
+.stage-pill .chip{margin-left:2px}
+.strip{margin-top:14px}
+.strip .inner{padding:18px 20px;border-radius:calc(var(--r-shell) - 7px)}
+.strip-hd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.strip-hd .meta{font-size:11px;color:var(--txt-3);font-weight:500}
+.strip-hd .sp{flex:1}
+.strip-grid{display:grid;grid-template-columns:300px 250px 1fr;gap:24px}
+.sg-h{font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--txt-3);margin-bottom:9px;display:flex;align-items:center;gap:8px}
+.sg-h .n{font-family:var(--mono);letter-spacing:0;font-size:10px;color:var(--txt-2)}
+.sg-desc{font-size:12px;color:var(--txt-2);line-height:1.7;font-weight:500}
+.sg-kv{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:5.5px 0;font-weight:600;color:var(--txt-2)}
+.sg-kv .v{font-family:var(--mono);color:var(--txt);font-size:10.5px}
+.art-row{display:flex;align-items:center;gap:9px;padding:6.5px 0;border-bottom:1px dashed rgba(255,255,255,.06);font-size:11.5px;font-weight:600}
+.art-row:last-child{border-bottom:none}
+.art-row .an{color:var(--txt-2)}
+.art-row .am{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--txt-3);white-space:nowrap}
+.ac-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+.ac-row{display:flex;align-items:flex-start;gap:8px;padding:5.5px 0;font-size:11.5px;line-height:1.45;font-weight:500;color:var(--txt-2)}
+.ac-row .i{color:var(--acc);flex:none;margin-top:2px;width:13px;height:13px}
+.ac-row .wt{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line-2);flex:none;margin-top:2.5px}
+.ac-row b{color:var(--txt);font-weight:700}
+.ac-row .src{font-size:9px;font-family:var(--mono);color:var(--txt-3);background:rgba(255,255,255,.04);border-radius:5px;padding:1.5px 6px;white-space:nowrap;align-self:center}
+
+/* ============ S7 阶段与模型配置 ============ */
+.cfg-wrap{display:grid;grid-template-columns:1fr 400px;gap:16px;align-items:start;margin-top:18px}
+.stage-card{border-radius:18px;background:var(--panel);border:1px solid var(--line);padding:16px 18px;display:flex;gap:15px;align-items:center;margin-bottom:10px}
+.stage-card .si{width:38px;height:38px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:var(--txt-2)}
+.stage-card .si .i{width:17px;height:17px}
+.stage-card .sinfo{flex:1;min-width:0}
+.stage-card .sn2{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:9px}
+.stage-card .sn2 .en{font-family:var(--mono);font-size:9.5px;color:var(--txt-3);font-weight:500;letter-spacing:.06em}
+.stage-card .sd{font-size:11.5px;color:var(--txt-3);margin-top:4px;line-height:1.55;font-weight:500}
+.stage-card .sd b{color:var(--txt-2)}
+.stage-card .sa{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.stage-card .sa span{font-size:9.5px;font-weight:600;color:var(--txt-2);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:7px;padding:2.5px 8px}
+.model-pick{flex:none;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.model-sel{display:flex;align-items:center;gap:9px;height:38px;padding:0 9px 0 14px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line-2);font-family:var(--mono);font-size:12px;font-weight:600;transition:all .4s var(--ease)}
+.model-sel:hover{border-color:rgba(52,211,153,.4)}
+.model-sel .i{width:13px;height:13px;color:var(--txt-3);transform:rotate(90deg)}
+.model-sel.custom{border-color:rgba(251,191,36,.4)}
+.model-hint{font-size:9.5px;color:var(--txt-3);font-family:var(--mono);font-weight:500}
+.para-card{border-radius:18px;border:1px solid rgba(52,211,153,.3);background:linear-gradient(135deg,rgba(52,211,153,.07),transparent 55%),var(--panel);padding:16px 18px;margin-bottom:10px}
+.para-hd{display:flex;align-items:center;gap:12px}
+.para-t{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:9px}
+.para-t .en{font-family:var(--mono);font-size:9.5px;color:var(--acc);font-weight:600;letter-spacing:.06em}
+.para-d{font-size:11.5px;color:var(--txt-3);line-height:1.6;margin-top:7px;font-weight:500}
+.para-d b{color:var(--txt-2)}
+.para-viz{display:flex;align-items:center;gap:14px;margin-top:13px}
+.pv-col{width:230px;display:flex;flex-direction:column;gap:7px;flex:none}
+.pv-bar{height:30px;border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 12px;font-size:10.5px;font-weight:700;border:1px solid;white-space:nowrap}
+.pv-bar.dev{background:var(--amber-dim);border-color:var(--amber-line);color:var(--amber)}
+.pv-bar.tst{background:var(--acc-dim);border-color:rgba(52,211,153,.3);color:var(--acc)}
+.pv-bar.run2{background:rgba(255,255,255,.04);border-color:var(--line);color:var(--txt-3)}
+.pv-arrow{flex:none;color:var(--txt-3);display:flex;align-items:center}
+.pv-arrow .i{width:16px;height:16px}
+.plan-out .inner{padding:18px 20px}
+.po-quote{border-radius:12px;background:rgba(255,255,255,.03);border:1px dashed var(--line-2);padding:11px 14px;font-size:12px;color:var(--txt-2);line-height:1.6;font-weight:500;margin-bottom:14px}
+.po-quote b{color:var(--txt)}
+.po-task{display:flex;align-items:center;gap:10px;padding:8.5px 0;border-bottom:1px dashed rgba(255,255,255,.06);font-size:12px;font-weight:600}
+.po-task:last-child{border-bottom:none}
+.po-task .no{font-family:var(--mono);font-size:10px;color:var(--txt-3);width:20px;flex:none}
+.po-task .tt{flex:1;color:var(--txt-2)}
+.rec-note{display:flex;gap:10px;padding:13px 15px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);font-size:11px;color:var(--txt-3);line-height:1.65;font-weight:500}
+.rec-note .i{width:14px;height:14px;color:var(--acc);margin-top:2px;flex:none}
+.rec-note b{color:var(--txt-2)}
+</style>
+</head>
+<body>
+<div class="orbs"></div><div class="grain"></div>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18C6 10.5 11 6 19 5.5c.3 8-3.5 12.7-11 12.9"/><path d="M6 18c1.5-4.5 4.5-7.5 9-9.5"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5a2 2 0 0 1 2-2h4.2L12 8h6.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7.5z"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5l1.7 4.6 4.6 1.7-4.6 1.7L12 17.1l-1.7-4.6-4.6-1.7 4.6-1.7L12 4.5z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 18.8a8.5 8.5 0 1 1 13.6 0"/><path d="M12 13.5L15.5 10"/><circle cx="12" cy="14" r="1.3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L20 20"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M4.5 7.5l7.5 5.5 7.5-5.5"/></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="5.5" r="2.2"/><circle cx="6.5" cy="18.5" r="2.2"/><circle cx="17.5" cy="7" r="2.2"/><path d="M6.5 7.7v8.6"/><path d="M17.5 9.2c0 4.2-4.5 4.9-8.6 5.6"/></symbol>
+    <symbol id="i-pr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6" r="2.2"/><circle cx="6.5" cy="18" r="2.2"/><circle cx="17.5" cy="17" r="2.2"/><path d="M6.5 8.2v7.6"/><path d="M17.5 14.8V9.5A2.5 2.5 0 0 0 15 7h-3.5"/><path d="M13.8 4.7L11.3 7l2.5 2.3"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9.7 7.9v8.2a.55.55 0 0 0 .84.47l6.9-4.1a.55.55 0 0 0 0-.94l-6.9-4.1a.55.55 0 0 0-.84.47z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8.2v4.3l3 1.8"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12.6l4.3 4.3L18.8 7.8"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.6L3.7 19a1 1 0 0 0 .86 1.5h14.9a1 1 0 0 0 .86-1.5L12 4.6z"/><path d="M12 10.5v3.5"/><path d="M12 17.3h.01"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 6.5l6 5.5-6 5.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9.5" cy="7" r="1.8" fill="var(--bg-core)"/><circle cx="14.5" cy="12" r="1.8" fill="var(--bg-core)"/><circle cx="8" cy="17" r="1.8" fill="var(--bg-core)"/></symbol>
+    <symbol id="i-up-r" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M9.5 7H17v7.5"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15.5" r="3.8"/><path d="M10.8 12.9L19.5 4.5"/><path d="M16 8l2.6 2.6"/><path d="M13.6 10.4l1.8 1.8"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="11" width="13" height="9" rx="2.5"/><path d="M8.5 11V8.5a3.5 3.5 0 0 1 7 0V11"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L5 6.4v5.1c0 4.5 2.9 7.4 7 8.9 4.1-1.5 7-4.4 7-8.9V6.4L12 3.5z"/><path d="M9.2 11.8l2 2 3.6-3.8"/></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5l4.8 4.5L5 16.5"/><path d="M12.5 17H19"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5.5v4h-4"/><path d="M20 9.5A8 8 0 1 0 20.5 13"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9 20.2c-1.5.6-2.6-.3-3-1.2M15.5 19.5v-2.7c0-.9-.3-1.5-.8-1.8 2-.3 3.9-1 3.9-4.3 0-1-.3-1.7-.9-2.3.3-.9.2-1.9-.1-2.4 0 0-.9-.3-2.9 1.1a9.4 9.4 0 0 0-5 0C8.7 5.6 7.8 5.9 7.8 5.9c-.3.5-.4 1.5-.1 2.4-.6.6-.9 1.3-.9 2.3 0 3.3 1.9 4 3.9 4.3-.5.3-.8.9-.8 1.8v2.8"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5l4 4L8 20l-4.5.5L4 16 14.5 5.5z"/><path d="M12.5 7.5l4 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5h15"/><path d="M9.5 6.5V4.8A1.3 1.3 0 0 1 10.8 3.5h2.4a1.3 1.3 0 0 1 1.3 1.3v1.7"/><path d="M6.5 6.5l1 13h9l1-13"/><path d="M10 10v6M14 10v6"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v6.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V5.5"/><path d="M5 12v6.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V12"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13.5 6.5L19 12l-5.5 5.5"/></symbol>
+    <symbol id="i-chev-d" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5l5.5 6 5.5-6"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5.5 13.5H11L10 21l7.5-10.5H12L13 3z"/></symbol>
+  </defs>
+</svg>
+
+<!-- ================================================== 01 全局仪表盘 -->
+<div class="stage">
+<div class="frame">
+  <div class="frame-label"><span class="no">01</span><span class="name">全局仪表盘</span><span class="desc">异常置顶 · 跨项目进度 · 状态计数（对应 FR-E1/E2）</span></div>
+  <div class="screen" id="s1">
+    <div class="app">
+      <aside class="side">
+        <div class="logo"><span class="mark"><svg class="i"><use href="#i-leaf"/></svg></span><span><span class="nm">Broccoli</span><span class="tag">CLOUD DEV OPS</span></span></div>
+        <a class="nav-item on"><svg class="i"><use href="#i-grid"/></svg>仪表盘</a>
+        <a class="nav-item"><svg class="i"><use href="#i-folder"/></svg>项目<span class="cnt">4</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-spark"/></svg>记忆库<span class="cnt">14</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-gauge"/></svg>用量与成本</a>
+        <div class="foot"><span class="av">T</span><div><div class="nm">Thomas Zhang</div><div class="st"><span class="dot"></span>BYO Key · 已连通</div></div></div>
+      </aside>
+      <div class="main">
+        <div class="topbar">
+          <div><div class="hi">早上好，Thomas</div><div class="dt">11 月 17 日 · 周二 · 有 2 个任务需要你处理</div></div>
+          <div class="sp"></div>
+          <div class="search"><svg class="i"><use href="#i-search"/></svg>搜索需求、任务…</div>
+          <button class="ico-btn mail-dot" style="width:38px;height:38px"><svg class="i"><use href="#i-mail"/></svg></button>
+        </div>
+
+        <div class="alerts">
+          <div class="alert amber"><div class="inner">
+            <div class="hd"><span class="chip chip-amber"><span class="dot pulse"></span>等待确认</span><span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-folder"/></svg>acme/api-gateway</span><span class="chip chip-gray">需求 #2</span></div>
+            <div class="ttl">Agent 需要你做一次数据库选型</div>
+            <div class="q">「会话需要持久化存储，选 <code>PostgreSQL + Redis</code> 还是 <code>SQLite</code>？」已保存会话快照，容器已释放，不会占用并发额度。</div>
+            <div class="ft"><span class="meta">已等待 12 分钟 · 快照剩余 23h 48m · ✉ 提醒邮件已发送 10:42</span>
+              <div class="acts"><button class="btn btn-amber btn-sm">去回答<span class="bi"><svg class="i"><use href="#i-arrow"/></svg></span></button></div></div>
+          </div></div>
+          <div class="alert red"><div class="inner">
+            <div class="hd"><span class="chip chip-red"><svg class="i" style="width:12px;height:12px"><use href="#i-alert"/></svg>执行失败 · 队列已暂停</span><span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-folder"/></svg>lab/ml-pipeline</span><span class="chip chip-gray">需求 #1</span></div>
+            <div class="ttl">依赖安装失败，后续 3 个需求已阻塞</div>
+            <div class="q">pnpm install 超时（registry 连接失败，自动重试 2 次未恢复）。该项目的失败策略为「失败暂停」。</div>
+            <div class="ft"><span class="meta">10:37 失败 · ✉ 提醒邮件已发送</span>
+              <div class="acts"><button class="btn btn-ghost btn-sm">查看日志</button><button class="btn btn-primary btn-sm">重试<span class="bi"><svg class="i"><use href="#i-refresh"/></svg></span></button></div></div>
+          </div></div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><span class="ic green"><svg class="i"><use href="#i-play"/></svg></span><div><div class="v">1</div><div class="l">执行中 · 并发 1/2</div></div></div>
+          <div class="stat"><span class="ic amber"><svg class="i"><use href="#i-clock"/></svg></span><div><div class="v">1</div><div class="l">等待确认</div></div></div>
+          <div class="stat"><span class="ic red"><svg class="i"><use href="#i-alert"/></svg></span><div><div class="v">1</div><div class="l">失败 / 队列暂停</div></div></div>
+          <div class="stat"><span class="ic blue"><svg class="i"><use href="#i-chev"/></svg></span><div><div class="v">7</div><div class="l">排队中</div></div></div>
+          <div class="stat"><span class="ic gray"><svg class="i"><use href="#i-check"/></svg></span><div><div class="v">4</div><div class="l">今日完成</div></div></div>
+        </div>
+
+        <div class="bento">
+          <div class="b7 pcard"><div class="shell"><div class="core inner">
+            <div class="hd"><span class="repo-i"><svg class="i"><use href="#i-github"/></svg></span>
+              <div><div class="rname">acme/api-gateway</div><div class="rmeta"><svg class="i" style="width:12px;height:12px"><use href="#i-branch"/></svg>main · 5 个需求 · 容器已释放（等待确认）</div></div>
+              <div style="margin-left:auto"><span class="chip chip-amber"><span class="dot pulse"></span>#2 等待确认</span></div></div>
+            <div class="prow"><span class="num">1/5</span><div class="progress amber" style="flex:1"><b style="width:20%"></b></div>
+              <div class="qdots"><i class="done"></i><i class="wait"></i><i></i><i></i><i></i></div></div>
+            <div class="cur"><svg class="i" style="width:14px;height:14px;color:var(--amber)"><use href="#i-clock"/></svg>
+              <b style="color:var(--txt)">#2 引入会话持久化存储</b>&nbsp;— 数据库选型待你回答，回复后 ~1 分钟恢复执行</div>
+            <div class="ft"><span class="chip chip-green"><svg class="i" style="width:12px;height:12px"><use href="#i-pr"/></svg>PR #13 已开出</span>
+              <span class="meta">09:58 · #3 #4 #5 排队中</span><span class="sp"></span><button class="btn btn-ghost btn-sm">进入项目<span class="bi"><svg class="i"><use href="#i-chev"/></svg></span></button></div>
+          </div></div></div>
+
+          <div class="b5 pcard"><div class="shell"><div class="core inner">
+            <div class="hd"><span class="repo-i"><svg class="i"><use href="#i-github"/></svg></span>
+              <div><div class="rname">devtools/cli-toolkit</div><div class="rmeta"><svg class="i" style="width:12px;height:12px"><use href="#i-branch"/></svg>main · 3 个需求 · 容器运行中</div></div>
+              <div style="margin-left:auto"><span class="chip chip-green"><span class="dot pulse"></span>#1 执行中</span></div></div>
+            <div class="prow"><span class="num">0/3</span><div class="progress" style="flex:1"><b style="width:6%"></b></div>
+              <div class="qdots"><i class="run"></i><i></i><i></i></div></div>
+            <div class="cur"><svg class="i" style="width:14px;height:14px;color:var(--acc)"><use href="#i-play"/></svg>
+              <b style="color:var(--txt)">#1 重构参数解析器</b>&nbsp;— 已执行 22 分钟 · 实时日志推送中</div>
+            <div class="ft"><span class="meta">环境准备 40s · 已注入 14 条记忆</span><span class="sp"></span><button class="btn btn-ghost btn-sm">查看任务</button></div>
+          </div></div></div>
+
+          <div class="b5 pcard"><div class="shell"><div class="core inner">
+            <div class="hd"><span class="repo-i"><svg class="i"><use href="#i-github"/></svg></span>
+              <div><div class="rname">lab/ml-pipeline</div><div class="rmeta"><svg class="i" style="width:12px;height:12px"><use href="#i-branch"/></svg>main · 4 个需求 · 容器已回收</div></div>
+              <div style="margin-left:auto"><span class="chip chip-red"><svg class="i" style="width:12px;height:12px"><use href="#i-alert"/></svg>队列已暂停</span></div></div>
+            <div class="prow"><span class="num">0/4</span><div class="progress red" style="flex:1"><b style="width:3%"></b></div>
+              <div class="qdots"><i class="fail"></i><i></i><i></i><i></i></div></div>
+            <div class="cur"><svg class="i" style="width:14px;height:14px;color:var(--red)"><use href="#i-alert"/></svg>
+              <b style="color:var(--txt)">#1 初始化数据管道骨架</b>&nbsp;— pnpm install 超时 · 失败策略「失败暂停」</div>
+            <div class="ft"><span class="meta">✉ 邮件已发送 10:37</span><span class="sp"></span><button class="btn btn-ghost btn-sm">处置</button></div>
+          </div></div></div>
+
+          <div class="b7 pcard"><div class="shell"><div class="core inner">
+            <div class="hd"><span class="repo-i"><svg class="i"><use href="#i-github"/></svg></span>
+              <div><div class="rname">thomas/portfolio-site</div><div class="rmeta"><svg class="i" style="width:12px;height:12px"><use href="#i-branch"/></svg>main · 3 个需求 · 容器已回收</div></div>
+              <div style="margin-left:auto"><span class="chip chip-green"><svg class="i" style="width:12px;height:12px"><use href="#i-check"/></svg>今日全部完成</span></div></div>
+            <div class="prow"><span class="num">3/3</span><div class="progress" style="flex:1"><b style="width:100%"></b></div>
+              <div class="qdots"><i class="done"></i><i class="done"></i><i class="done"></i></div></div>
+            <div class="cur"><svg class="i" style="width:14px;height:14px;color:var(--acc)"><use href="#i-pr"/></svg>
+              <b style="color:var(--txt)">3 个堆叠 PR 待按序合并</b>&nbsp;— #8 → #9 → #10，合并 #8 后其余自动改变 base</div>
+            <div class="ft"><span class="meta">09:30 完成 · 记忆提案 3 条待确认</span><span class="sp"></span><button class="btn btn-ghost btn-sm">Review 交付<span class="bi"><svg class="i"><use href="#i-arrow"/></svg></span></button></div>
+          </div></div></div>
+
+          <div class="b12 pcard"><div class="shell"><div class="core tl">
+            <div class="fh" style="font-size:12.5px;font-weight:800;padding:14px 0 6px;letter-spacing:.04em;color:var(--txt-2)">今日活动</div>
+            <div class="tl-row"><span class="t">10:42</span><svg class="i" style="width:14px;height:14px;color:var(--amber)"><use href="#i-mail"/></svg><span class="tx">邮件已发送 · <b>api-gateway #2</b> 进入等待确认（数据库选型）</span><span class="chip chip-amber" style="margin-left:auto">等待确认</span></div>
+            <div class="tl-row"><span class="t">10:37</span><svg class="i" style="width:14px;height:14px;color:var(--red)"><use href="#i-mail"/></svg><span class="tx">邮件已发送 · <b>ml-pipeline #1</b> 执行失败，队列按「失败暂停」策略挂起</span><span class="chip chip-red" style="margin-left:auto">失败</span></div>
+            <div class="tl-row"><span class="t">09:58</span><svg class="i" style="width:14px;height:14px;color:var(--acc)"><use href="#i-pr"/></svg><span class="tx"><b>api-gateway #1</b> 完成 · PR #13 已开出（broccoli/1-fix-login-redirect → 上一个成功分支）</span><span class="chip chip-green" style="margin-left:auto">完成</span></div>
+            <div class="tl-row"><span class="t">09:12</span><svg class="i" style="width:14px;height:14px;color:var(--txt-3)"><use href="#i-spark"/></svg><span class="tx"><b>portfolio-site</b> 生成 3 条记忆提案，已自动注入队列后续任务</span><span class="chip chip-blue" style="margin-left:auto">记忆</span></div>
+          </div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================== 02 项目详情 · 需求队列 -->
+<div class="frame">
+  <div class="frame-label"><span class="no">02</span><span class="name">项目详情 · 需求队列</span><span class="desc">批量提交 · 串行队列 · 堆叠 PR 链 · 容器与记忆预览（FR-C/D/F/G）</span></div>
+  <div class="screen" id="s2">
+    <div class="app">
+      <aside class="side">
+        <div class="logo"><span class="mark"><svg class="i"><use href="#i-leaf"/></svg></span><span><span class="nm">Broccoli</span><span class="tag">CLOUD DEV OPS</span></span></div>
+        <a class="nav-item"><svg class="i"><use href="#i-grid"/></svg>仪表盘</a>
+        <a class="nav-item on"><svg class="i"><use href="#i-folder"/></svg>项目<span class="cnt">4</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-spark"/></svg>记忆库<span class="cnt">14</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-gauge"/></svg>用量与成本</a>
+        <div class="foot"><span class="av">T</span><div><div class="nm">Thomas Zhang</div><div class="st"><span class="dot"></span>BYO Key · 已连通</div></div></div>
+      </aside>
+      <div class="main">
+        <div class="crumb"><svg class="i" style="width:13px;height:13px"><use href="#i-folder"/></svg>项目 <svg class="i" style="width:12px;height:12px"><use href="#i-chev"/></svg> <b>acme/api-gateway</b></div>
+        <div class="phd">
+          <span class="repo-i"><svg class="i"><use href="#i-github"/></svg></span>
+          <div>
+            <div class="rname">acme/api-gateway</div>
+            <div class="rmeta">
+              <span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-branch"/></svg>main</span>
+              <span class="chip chip-gray"><span class="dot"></span>容器已释放 · 回复确认后 ~1 分钟恢复</span>
+              <span class="chip chip-gray">并发槽位 1/2</span>
+            </div>
+          </div>
+          <div class="acts"><button class="btn btn-ghost"><svg class="i"><use href="#i-sliders"/></svg>设置</button><button class="btn btn-primary">提交需求<span class="bi"><svg class="i"><use href="#i-plus"/></svg></span></button></div>
+        </div>
+
+        <div class="split">
+          <div>
+            <div class="sec-hd"><span class="t">需求队列</span>
+              <span class="chip chip-gray">全部 5</span><span class="chip chip-green">完成 1</span><span class="chip chip-amber">等待确认 1</span><span class="chip chip-blue">排队中 3</span></div>
+
+            <div class="compose shell" style="margin-bottom:16px"><div class="core inner">
+              <div class="fake-input">
+                <div>· 将 /api/orders 列表接口改为<b>游标分页</b>，支持 status 与 created_at 筛选</div>
+                <div>· 为分页参数补充 <b>zod 校验</b>与统一错误码</div>
+                <div>· 更新 orders.service 的<b>集成测试</b><span class="caret"></span></div>
+              </div>
+              <div class="ft">
+                <span class="hint"><svg class="i" style="width:13px;height:13px"><use href="#i-alert"/></svg>失败时暂停队列并邮件通知你</span>
+                <div class="seg"><span class="on">失败暂停</span><span>失败自动跳过</span></div>
+                <span class="sp" style="flex:1"></span>
+                <span class="hint">将按序创建 3 个需求</span>
+                <button class="btn btn-primary">提交 3 个需求<span class="bi"><svg class="i"><use href="#i-up-r"/></svg></span></button>
+              </div>
+            </div></div>
+
+            <div class="queue">
+              <div class="qrow done">
+                <div class="r1"><span class="grip">⠿</span><span class="no">#1</span><span class="ttl">修复登录态过期后无限重定向的问题</span>
+                  <div class="meta-r"><span class="chip chip-green"><svg class="i" style="width:12px;height:12px"><use href="#i-check"/></svg>完成</span>
+                  <span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-pr"/></svg>PR #13</span><span class="meta-r" style="font-family:var(--mono);font-size:11px;color:var(--txt-3)">09:58</span></div></div>
+              </div>
+              <div class="qrow wait">
+                <div class="r1"><span class="grip">⠿</span><span class="no">#2</span><span class="ttl">引入会话持久化存储，支持限流计数</span>
+                  <div class="meta-r"><span class="chip chip-amber"><span class="dot pulse"></span>等待确认</span>
+                  <button class="btn btn-amber btn-sm">去回答<span class="bi"><svg class="i"><use href="#i-arrow"/></svg></span></button></div></div>
+                <div class="exp"><span class="ic-big"><svg class="i"><use href="#i-db"/></svg></span>
+                  <div class="tx"><b>Agent 提问：</b>会话存储选型 PostgreSQL + Redis 还是 SQLite？<br>
+                  <span style="color:var(--txt-3)">快照已保存 · 容器已释放 · 不占用并发槽位 · 快照剩余 23h 48m</span></div></div>
+              </div>
+              <div class="qrow">
+                <div class="r1"><span class="grip">⠿</span><span class="no">#3</span><span class="ttl">重构通知模块为事件驱动架构</span>
+                  <div class="meta-r"><span class="chip chip-blue">排队中 · 下一个</span></div></div>
+                <div class="exp" style="border-top:none;padding-top:0;margin-top:-4px">
+                  <span class="ic-big" style="background:var(--blue-dim);color:var(--blue)"><svg class="i"><use href="#i-spark"/></svg></span>
+                  <div class="tx"><b>启动时将注入：</b>14 条已确认记忆 + #1 #2 产生的 3 条待确认提案（提案即注入，无需等待你确认）<br>
+                  <span style="color:var(--txt-3)">分支将基于最后一个成功任务 broccoli/1-fix-login-redirect</span></div></div>
+              </div>
+              <div class="qrow">
+                <div class="r1"><span class="grip">⠿</span><span class="no">#4</span><span class="ttl">为 /api/orders 添加分页与筛选</span>
+                  <div class="meta-r"><span class="chip chip-blue">排队中</span><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-edit"/></svg></button><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-trash"/></svg></button></div></div>
+              </div>
+              <div class="qrow">
+                <div class="r1"><span class="grip">⠿</span><span class="no">#5</span><span class="ttl">补齐订单模块的单元测试</span>
+                  <div class="meta-r"><span class="chip chip-blue">排队中</span><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-edit"/></svg></button><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-trash"/></svg></button></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rail">
+            <div class="prchain shell"><div class="core inner">
+              <div class="sec-hd" style="margin-bottom:16px"><span class="t" style="font-size:13.5px">堆叠 PR 链</span><span class="chip chip-gray" style="margin-left:auto">按序合并</span></div>
+              <div class="pr-node"><span class="pt">M</span><div class="pbody"><div class="pn">main</div><div class="pd">默认分支</div></div></div>
+              <div class="pr-node done"><span class="pt"><svg class="i" style="width:11px;height:11px"><use href="#i-check"/></svg></span>
+                <div class="pbody"><div class="pn">PR #13 · 需求 #1</div><div class="pd">修复登录重定向 · <b>broccoli/1-fix-login-redirect</b></div><div class="pc"><span class="chip chip-green">可合并</span></div></div></div>
+              <div class="pr-node"><span class="pt">2</span>
+                <div class="pbody"><div class="pn">PR #14 · 需求 #2（待开出）</div><div class="pd">完成并回答确认后自动创建 · 基于 <b>#13 分支</b></div><div class="pc"><span class="chip chip-amber"><span class="dot pulse"></span>等待确认</span></div></div></div>
+              <div class="pr-node pend last"><span class="pt">3</span>
+                <div class="pbody"><div class="pn">PR #15 · 需求 #3（计划）</div><div class="pd">将基于 <b>#14 分支</b> · 队列按序合并即可</div></div></div>
+            </div></div>
+
+            <div class="memprev shell"><div class="core inner">
+              <div class="sec-hd" style="margin-bottom:10px"><span class="t" style="font-size:13.5px">记忆注入预览</span><span class="chip chip-blue" style="margin-left:auto">提案即注入</span></div>
+              <div class="row">已确认记忆<span class="n">14 条</span></div>
+              <div class="row">待确认提案（#1 · #2）<span class="n">3 条</span></div>
+              <div class="note">下个任务 <b>#3</b> 启动时全量加载。否决提案可追溯受影响任务（见记忆库）。</div>
+            </div></div>
+
+            <div class="cbox shell"><div class="core inner">
+              <div class="sec-hd" style="margin-bottom:8px"><span class="t" style="font-size:13.5px">容器与成本</span></div>
+              <div class="r">本队列容器会话<span class="v">1h 42m</span></div>
+              <div class="r">任务间复用 · clone/依赖仅 1 次<span class="v">✓</span></div>
+              <div class="r">会话快照<span class="v">1 份 · 24h 过期</span></div>
+              <div class="r">队列空闲自动回收<span class="v">已释放</span></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================== 03 任务详情 · 等待确认 -->
+<div class="frame">
+  <div class="frame-label"><span class="no">03</span><span class="name">任务详情 · 等待确认</span><span class="desc">结构化提问 + 自由输入 · 快照挂起 · 实时日志 + 变更文件（FR-D4/D5/D7/D8）</span></div>
+  <div class="screen" id="s3">
+    <div class="app">
+      <aside class="side">
+        <div class="logo"><span class="mark"><svg class="i"><use href="#i-leaf"/></svg></span><span><span class="nm">Broccoli</span><span class="tag">CLOUD DEV OPS</span></span></div>
+        <a class="nav-item"><svg class="i"><use href="#i-grid"/></svg>仪表盘</a>
+        <a class="nav-item on"><svg class="i"><use href="#i-folder"/></svg>项目<span class="cnt">4</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-spark"/></svg>记忆库<span class="cnt">14</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-gauge"/></svg>用量与成本</a>
+        <div class="foot"><span class="av">T</span><div><div class="nm">Thomas Zhang</div><div class="st"><span class="dot"></span>BYO Key · 已连通</div></div></div>
+      </aside>
+      <div class="main">
+        <div class="crumb"><svg class="i" style="width:13px;height:13px"><use href="#i-folder"/></svg>项目 <svg class="i" style="width:12px;height:12px"><use href="#i-chev"/></svg> <b>acme/api-gateway</b> <svg class="i" style="width:12px;height:12px"><use href="#i-chev"/></svg> 需求 #2</div>
+        <div class="task-hd">
+          <div>
+            <div class="ttl-h">引入会话持久化存储，支持限流计数</div>
+            <div class="meta">
+              <span class="chip chip-amber"><span class="dot pulse"></span>等待确认</span>
+              <span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-branch"/></svg>broccoli/2-session-store</span>
+              <span class="chip chip-gray">base · broccoli/1-fix-login-redirect</span>
+              <span class="chip chip-gray">已执行 26m</span>
+              <span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-clock"/></svg>快照剩余 23h 48m</span>
+              <span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-mail"/></svg>✉ 已发送 10:42</span>
+            </div>
+          </div>
+          <div class="acts"><button class="btn btn-ghost">暂停任务</button><button class="btn btn-ghost"><svg class="i"><use href="#i-x"/></svg>取消</button></div>
+        </div>
+
+        <div class="confirm-card"><div class="inner">
+          <div class="q-hd"><span class="qi"><svg class="i"><use href="#i-db"/></svg></span>
+            <div><div class="qt">会话存储选型 — 需要你的决定</div></div>
+            <span class="chip chip-amber" style="margin-left:auto"><span class="dot pulse"></span>回答后 ~1 分钟恢复</span></div>
+          <div class="qq">任务需要持久化「用户会话」与「接口限流计数」。结合本仓库已确认记忆「生产拓扑为 PostgreSQL」，我倾向 <b style="color:var(--txt)">PostgreSQL + Redis</b>；但如果你希望保持零运维，SQLite 也可满足当前规模。请选择方案，或补充你的想法。</div>
+          <div class="opts">
+            <div class="opt sel"><span class="radio"></span>
+              <div class="ot">PostgreSQL + Redis <span class="rec">推荐</span></div>
+              <div class="od">与生产拓扑一致 · 原生 TTL 适合限流计数 · 支持并发写入</div></div>
+            <div class="opt"><span class="radio"></span>
+              <div class="ot">SQLite</div>
+              <div class="od">零运维 · 单机部署友好 · 写入并发与水平扩展受限</div></div>
+            <div class="opt" style="padding-bottom:12px"><span class="radio"></span>
+              <div class="ot">其他方案</div>
+              <div class="od" style="margin-bottom:8px">在下方补充你的想法</div>
+              <div style="height:34px;border-radius:10px;border:1px dashed var(--line-2);display:flex;align-items:center;padding:0 12px;font-size:11.5px;color:var(--txt-3);font-weight:500">例如：MongoDB，因为团队更熟…</div></div>
+          </div>
+          <div class="aft">
+            <button class="btn btn-primary">回答并继续执行<span class="bi"><svg class="i"><use href="#i-arrow"/></svg></span></button>
+            <button class="btn btn-ghost">暂不处理 · 24h 后自动挂起</button>
+            <span class="sp" style="flex:1"></span>
+            <span class="note"><svg class="i" style="width:13px;height:13px"><use href="#i-shield"/></svg>会话快照已保存 · 容器已释放 · 不占并发槽位</span>
+          </div>
+        </div></div>
+
+        <div class="tabs"><span class="on">实时日志</span><span>Diff · 4 个文件</span><span>对话历史 · 2</span><span>记忆注入</span></div>
+        <div class="termwrap">
+          <div class="shell" style="border-radius:22px"><div class="core" style="overflow:hidden">
+            <div class="term-bar"><span class="td" style="background:#f87171"></span><span class="td" style="background:#fbbf24"></span><span class="td" style="background:#34d399"></span><span class="tt">run #42 · broccoli/2-session-store · SSE</span></div>
+            <div class="term" style="border:none;border-radius:0 0 13px 13px">
+              <div><span class="ts">10:18:04</span><span class="ok">▶</span> 任务启动 · 加载 14 条已确认记忆 + 3 条待注入提案</div>
+              <div><span class="ts">10:18:06</span><span class="ok">✓</span> 工作区就绪 <span class="tx">broccoli/2-session-store</span>（基于 broccoli/1-fix-login-redirect）</div>
+              <div><span class="ts">10:18:07</span><span class="dim">·</span> 阅读源码 <span class="tx">src/auth/session.ts · src/middleware.ts</span></div>
+              <div><span class="ts">10:18:41</span><span class="dim">·</span> 编辑 <span class="tx">src/auth/session.ts</span> <span class="ok">+86</span> <span style="color:var(--red)">−12</span></div>
+              <div><span class="ts">10:19:15</span><span class="dim">·</span> 新增 <span class="tx">src/store/session-store.ts</span></div>
+              <div><span class="ts">10:20:58</span><span class="dim">·</span> 编辑 <span class="tx">package.json</span> · pg / ioredis 依赖待确认</div>
+              <div><span class="ts">10:21:02</span><span class="warn">!</span> 需要决策：会话存储选型（PostgreSQL+Redis vs SQLite）</div>
+              <div><span class="ts">10:21:03</span><span class="ok">⏸</span> 已保存会话快照 · 容器已释放 · 提醒邮件已发送<span class="caret" style="display:inline-block;width:7px;height:14px;background:var(--acc);animation:gl 1.2s var(--ease) infinite;vertical-align:-2px;margin-left:8px"></span></div>
+            </div>
+          </div></div>
+          <div class="file-list shell"><div class="core inner">
+            <div class="fh"><svg class="i" style="width:14px;height:14px"><use href="#i-term"/></svg>本轮变更 · 4 个文件</div>
+            <div class="frow"><svg class="i" style="width:13px;height:13px;color:var(--txt-3)"><use href="#i-edit"/></svg><span class="fn">src/auth/session.ts</span><span class="add">+86</span><span class="del">−12</span></div>
+            <div class="frow"><svg class="i" style="width:13px;height:13px;color:var(--txt-3)"><use href="#i-edit"/></svg><span class="fn">src/store/session-store.ts</span><span class="add">+64</span><span class="new">NEW</span></div>
+            <div class="frow"><svg class="i" style="width:13px;height:13px;color:var(--txt-3)"><use href="#i-edit"/></svg><span class="fn">src/middleware.ts</span><span class="add">+18</span><span class="del">−6</span></div>
+            <div class="frow"><svg class="i" style="width:13px;height:13px;color:var(--txt-3)"><use href="#i-edit"/></svg><span class="fn">package.json</span><span class="add">+3</span><span class="del">−1</span></div>
+            <div class="dstat">合计 <b>+171</b> <i>−19</i> · 待回答确认后继续</div>
+            <div style="margin-top:10px;border-radius:12px;border:1px dashed var(--line);padding:11px 13px;font-size:11.5px;color:var(--txt-3);line-height:1.6;font-weight:500">Diff 视图提供文件级 / 行级对比；<b style="color:var(--txt-2)">对话历史</b>保留本次选型讨论全文。</div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================== 04 记忆库 -->
+<div class="frame">
+  <div class="frame-label"><span class="no">04</span><span class="name">记忆库 · 提案确认与依赖追溯</span><span class="desc">批量确认 · 注入状态 · 否决影响评估（FR-G2–G6）</span></div>
+  <div class="screen" id="s4">
+    <div class="app">
+      <aside class="side">
+        <div class="logo"><span class="mark"><svg class="i"><use href="#i-leaf"/></svg></span><span><span class="nm">Broccoli</span><span class="tag">CLOUD DEV OPS</span></span></div>
+        <a class="nav-item"><svg class="i"><use href="#i-grid"/></svg>仪表盘</a>
+        <a class="nav-item"><svg class="i"><use href="#i-folder"/></svg>项目<span class="cnt">4</span></a>
+        <a class="nav-item on"><svg class="i"><use href="#i-spark"/></svg>记忆库<span class="cnt">14</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-gauge"/></svg>用量与成本</a>
+        <div class="foot"><span class="av">T</span><div><div class="nm">Thomas Zhang</div><div class="st"><span class="dot"></span>BYO Key · 已连通</div></div></div>
+      </aside>
+      <div class="main">
+        <div class="mem-hd">
+          <div><div class="t">记忆库</div>
+            <div style="font-size:12px;color:var(--txt-3);margin-top:5px;font-family:var(--mono);font-weight:500">acme/api-gateway · 执行前自动注入</div></div>
+          <div class="cnts" style="margin-left:18px">
+            <span class="chip chip-green">已确认 14</span><span class="chip chip-amber">待确认 3</span><span class="chip chip-gray">已禁用 1</span></div>
+          <div class="acts">
+            <div class="search" style="width:200px"><svg class="i"><use href="#i-search"/></svg>搜索记忆…</div>
+            <button class="btn btn-primary">批量确认 3 条<span class="bi"><svg class="i"><use href="#i-check"/></svg></span></button></div>
+        </div>
+
+        <div class="sec-hd"><span class="t">待确认提案</span><span class="chip chip-blue">已注入排队中的 #3 #4 #5</span></div>
+        <div class="prop-grid" style="margin-bottom:26px">
+          <div class="prop shell"><div class="core inner">
+            <div class="ph"><span class="chip chip-blue">决策</span><span class="src">来源 #1 · 09:58</span></div>
+            <div class="body">登录态过期统一返回 <b>401 + 前端静默刷新</b>，不做页面级重定向兜底。</div>
+            <div class="inj"><svg class="i"><use href="#i-arrow"/></svg>已注入任务 #3 · #4 · #5（提案即注入）</div>
+            <div class="pa"><button class="btn btn-primary btn-sm">确认入库<span class="bi"><svg class="i"><use href="#i-check"/></svg></span></button>
+              <button class="btn btn-ghost btn-sm">编辑</button><button class="btn btn-ghost btn-sm" style="color:var(--red)">否决</button></div>
+          </div></div>
+          <div class="prop shell"><div class="core inner">
+            <div class="ph"><span class="chip chip-blue">规范</span><span class="src">来源 #1 · 09:58</span></div>
+            <div class="body">路由层错误统一走 <b>withErrorHandler 装饰器</b>，禁止在 handler 内裸 try/catch。</div>
+            <div class="inj"><svg class="i"><use href="#i-arrow"/></svg>已注入任务 #3 · #4 · #5（提案即注入）</div>
+            <div class="pa"><button class="btn btn-primary btn-sm">确认入库<span class="bi"><svg class="i"><use href="#i-check"/></svg></span></button>
+              <button class="btn btn-ghost btn-sm">编辑</button><button class="btn btn-ghost btn-sm" style="color:var(--red)">否决</button></div>
+          </div></div>
+          <div class="prop shell"><div class="core inner">
+            <div class="ph"><span class="chip chip-amber">教训</span><span class="src">来源 #1 · 09:58</span></div>
+            <div class="body">沙箱内 <b>pnpm install 必须带 --frozen-lockfile</b>，否则 lockfile 漂移会导致构建失败。</div>
+            <div class="inj"><svg class="i"><use href="#i-arrow"/></svg>已注入任务 #3 · #4 · #5（提案即注入）</div>
+            <div class="pa"><button class="btn btn-primary btn-sm">确认入库<span class="bi"><svg class="i"><use href="#i-check"/></svg></span></button>
+              <button class="btn btn-ghost btn-sm">编辑</button><button class="btn btn-ghost btn-sm" style="color:var(--red)">否决</button></div>
+          </div></div>
+        </div>
+
+        <div class="sec-hd"><span class="t">已确认记忆</span><span class="chip chip-gray">14 条 · 全量注入每个任务</span></div>
+        <div class="mem-rows" style="margin-bottom:26px">
+          <div class="mem-row"><span class="chip chip-blue">规范</span>
+            <div class="body"><div class="tx">技术栈：<b>Next.js 14 + tRPC + PostgreSQL</b>；包管理固定 pnpm，禁止 npm / yarn</div><div class="mt">v3 · 更新于 11-12 · 注入 46 次</div></div>
+            <span class="toggle on"></span><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-edit"/></svg></button><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-trash"/></svg></button></div>
+          <div class="mem-row"><span class="chip chip-blue">决策</span>
+            <div class="body"><div class="tx">API 鉴权统一 <b>Session（HttpOnly Cookie）</b>，不引入 JWT</div><div class="mt">v2 · 编辑过 · 11-14 · 注入 31 次</div></div>
+            <span class="toggle on"></span><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-edit"/></svg></button><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-trash"/></svg></button></div>
+          <div class="mem-row"><span class="chip chip-blue">规范</span>
+            <div class="body"><div class="tx">Commit 遵循 <b>Conventional Commits</b>，描述用中文</div><div class="mt">v1 · 11-02 · 注入 52 次</div></div>
+            <span class="toggle on"></span><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-edit"/></svg></button><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-trash"/></svg></button></div>
+          <div class="mem-row"><span class="chip chip-blue">事实</span>
+            <div class="body"><div class="tx">测试框架 <b>vitest</b>：命令 pnpm test:ci；沙箱内测试失败即任务失败</div><div class="mt">v1 · 11-10 · 注入 24 次</div></div>
+            <span class="toggle on"></span><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-edit"/></svg></button><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-trash"/></svg></button></div>
+          <div class="mem-row off"><span class="chip chip-gray">规范</span>
+            <div class="body"><div class="tx">样式统一 <b>CSS Modules</b>（已过时 — 项目已迁移 Tailwind）</div><div class="mt">v1 · 10-28 · 已禁用 · 历史注入记录保留</div></div>
+            <span class="toggle"></span><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-edit"/></svg></button><button class="ico-btn"><svg class="i" style="width:14px;height:14px"><use href="#i-trash"/></svg></button></div>
+        </div>
+
+        <div class="shell"><div class="core" style="padding:9px"><div class="trace">
+          <div class="th"><svg class="i" style="width:17px;height:17px;color:var(--red)"><use href="#i-alert"/></svg><span class="tt">否决影响评估 · 依赖追溯</span>
+            <span class="chip chip-red" style="margin-left:auto">若否决「Session 鉴权，不引入 JWT」</span></div>
+          <div class="td">该提案曾注入以下任务，其产出将基于被否决的结论。系统不会自动重跑 — 由你决定是否<b>重新入队</b>以获得正确上下文。</div>
+          <div class="trace-row"><span class="no">#3</span><span class="tt2">重构通知模块为事件驱动架构</span><span class="chip chip-blue st">排队中</span></div>
+          <div class="trace-row"><span class="no">#4</span><span class="tt2">为 /api/orders 添加分页与筛选</span><span class="chip chip-blue st">排队中</span></div>
+          <div class="trace-row" style="margin-bottom:14px"><span class="no">#5</span><span class="tt2">补齐订单模块的单元测试</span><span class="chip chip-blue st">排队中</span></div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn btn-red-g btn-sm">重新入队 3 个任务<span class="bi"><svg class="i"><use href="#i-refresh"/></svg></span></button>
+            <button class="btn btn-ghost btn-sm">仍然否决 · 仅影响未来任务</button>
+            <span style="font-size:11px;color:var(--txt-3);font-weight:500;margin-left:auto;font-family:var(--mono)">injections(proposal) × queue(seq)</span></div>
+        </div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================== 05 接入引导 -->
+<div class="frame">
+  <div class="frame-label"><span class="no">05</span><span class="name">接入引导 · 双钥匙</span><span class="desc">GitHub OAuth + BYO Anthropic Key · 加密与白名单说明（FR-A2/A3、FR-H1/H2）</span></div>
+  <div class="screen" id="s5">
+    <div class="onb">
+      <div class="logo"><span class="mark"><svg class="i"><use href="#i-leaf"/></svg></span><span><span class="nm" style="font-size:20px">Broccoli</span><span class="tag">CLOUD DEV OPS</span></span></div>
+      <div class="hero">交出两把钥匙，然后去喝杯咖啡</div>
+      <div class="sub">GitHub 让我们读写你的代码并开出 PR · Anthropic Key 驱动 Agent 按你的用量计费</div>
+
+      <div class="wizard">
+        <div>
+          <div class="steps">
+            <div class="step done"><span class="sn"><svg class="i" style="width:13px;height:13px"><use href="#i-check"/></svg></span><span class="sl">连接 GitHub</span></div>
+            <div class="step-line done"></div>
+            <div class="step cur"><span class="sn">2</span><span class="sl">配置 Anthropic Key</span></div>
+            <div class="step-line"></div>
+            <div class="step"><span class="sn">3</span><span class="sl">选择仓库</span></div>
+          </div>
+          <div class="keycard shell"><div class="core inner">
+            <div class="lbl"><svg class="i" style="width:15px;height:15px;color:var(--acc)"><use href="#i-key"/></svg>Anthropic API Key</div>
+            <div class="keyrow">
+              <div class="key-input"><span class="mask">sk-ant-api03-••••••••••••••••••••••</span>3fA2</div>
+              <button class="btn btn-ghost" style="height:48px">重新填写</button></div>
+            <div class="key-ok"><svg class="i" style="width:15px;height:15px"><use href="#i-check"/></svg>连接正常<span class="d">· 可用模型 claude-sonnet-4-5 · 延迟 82ms · 用量将计入你的 Anthropic 账户</span></div>
+            <div class="sec-note"><svg class="i"><use href="#i-shield"/></svg><div><b>密钥以 AES-256-GCM 加密存储</b>，主密钥与数据库分离托管；界面永不回显完整明文。沙箱容器启用<b>出口网络白名单</b>，仅允许访问 Anthropic 与 GitHub 端点。</div></div>
+            <div class="onb-ft">
+              <button class="btn btn-primary" style="height:46px">下一步 · 选择仓库<span class="bi"><svg class="i"><use href="#i-arrow"/></svg></span></button>
+              <span style="font-size:11.5px;color:var(--txt-3);font-weight:500">平台不转售算力 · 只为沙箱时长付成本价</span></div>
+          </div></div>
+          <div class="onb-note">MVP 仅支持 GitHub repo 项目 · 沙箱文件项目即将推出</div>
+        </div>
+
+        <div class="expl">
+          <div class="railcard shell"><div class="core inner">
+            <div class="rt"><svg class="i" style="width:15px;height:15px"><use href="#i-github"/></svg>GitHub · 代码通道</div>
+            <div class="rd">最小化授权 scope：<b>repo 读写</b>（clone / push 分支 / 开 PR）。Push 凭证仅在执行窗口内注入，<b>用后即撤</b>。</div>
+            <span class="chip chip-green"><svg class="i" style="width:12px;height:12px"><use href="#i-check"/></svg>已授权 · thomaszhang</span></div></div>
+          <div class="railcard shell"><div class="core inner">
+            <div class="rt"><svg class="i" style="width:15px;height:15px;color:var(--acc)"><use href="#i-spark"/></svg>Anthropic · 算力通道</div>
+            <div class="rd">BYO Key 模式：Agent 的每一次调用都<b>直接计入你的账户</b>，平台不差价。可随时更换 Key 或设置用量熔断。</div>
+            <span class="chip chip-amber"><svg class="i" style="width:12px;height:12px"><use href="#i-key"/></svg>BYO · 按用量付费</span></div></div>
+          <div class="railcard shell"><div class="core inner">
+            <div class="rt"><svg class="i" style="width:15px;height:15px"><use href="#i-lock"/></svg>沙箱承诺</div>
+            <div class="rd">容器非特权运行 · 只读根文件系统 · <b>容器间网络隔离</b> · 队列空闲 60 秒内自动回收。</div>
+            <span class="chip chip-gray">e2e 加密 · 审计日志</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ================================================== 06 任务执行画布 -->
+<div class="frame">
+  <div class="frame-label"><span class="no">06</span><span class="name">任务执行画布</span><span class="desc">阶段流水线可视 · 开发 ∥ 测试用例并行 · 验收标准达成跟踪 · 分阶段模型</span></div>
+  <div class="screen" id="s6">
+    <div class="app">
+      <aside class="side">
+        <div class="logo"><span class="mark"><svg class="i"><use href="#i-leaf"/></svg></span><span><span class="nm">Broccoli</span><span class="tag">CLOUD DEV OPS</span></span></div>
+        <a class="nav-item"><svg class="i"><use href="#i-grid"/></svg>仪表盘</a>
+        <a class="nav-item on"><svg class="i"><use href="#i-folder"/></svg>项目<span class="cnt">4</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-spark"/></svg>记忆库<span class="cnt">14</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-gauge"/></svg>用量与成本</a>
+        <div class="foot"><span class="av">T</span><div><div class="nm">Thomas Zhang</div><div class="st"><span class="dot"></span>BYO Key · 已连通</div></div></div>
+      </aside>
+      <div class="main">
+        <div class="crumb"><svg class="i" style="width:13px;height:13px"><use href="#i-folder"/></svg>项目 <svg class="i" style="width:12px;height:12px"><use href="#i-chev"/></svg> <b>acme/api-gateway</b> <svg class="i" style="width:12px;height:12px"><use href="#i-chev"/></svg> 需求 #2 · 执行画布</div>
+        <div class="task-hd">
+          <div>
+            <div class="ttl-h">引入会话持久化存储，支持限流计数</div>
+            <div class="meta">
+              <span class="chip chip-amber"><span class="dot pulse"></span>开发阶段 · 等待确认</span>
+              <span class="chip chip-gray">总耗时 31m</span>
+              <span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-check"/></svg>验收达成 2/8</span>
+              <span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-branch"/></svg>broccoli/2-session-store</span>
+              <span class="chip chip-gray"><svg class="i" style="width:12px;height:12px"><use href="#i-mail"/></svg>✉ 已发送 10:42</span>
+            </div>
+          </div>
+          <div class="acts">
+            <button class="btn btn-ghost">暂停任务</button>
+            <button class="btn btn-amber">去回答确认<span class="bi"><svg class="i"><use href="#i-arrow"/></svg></span></button>
+          </div>
+        </div>
+
+        <div class="cv-toolbar">
+          <span class="ttl">执行画布</span>
+          <span class="legend"><span><i style="background:var(--acc-deep)"></i>已完成</span><span><i style="background:var(--acc)" class="pulse"></i>执行中</span><span><i style="background:var(--amber)"></i>等待确认</span><span><i class="lq"></i>排队中</span></span>
+          <span class="sp" style="flex:1"></span>
+          <div class="zoom"><button class="zc">−</button><span>86%</span><button class="zc">+</button><button class="zc" style="border-left:1px solid var(--line);border-radius:0">适配</button></div>
+          <button class="btn btn-ghost btn-sm">全屏</button>
+          <button class="btn btn-primary btn-sm">阶段与模型配置<span class="bi"><svg class="i"><use href="#i-sliders"/></svg></span></button>
+        </div>
+
+        <div class="shell"><div class="canvas-wrap">
+          <svg class="edges" width="1110" height="644" viewBox="0 0 1110 644">
+            <path class="edge done" d="M158 318 C 180 318 176 302 196 302"/>
+            <path class="edge active" d="M442 276 C 470 276 468 160 496 160"/>
+            <path class="edge active" d="M442 330 C 470 330 468 480 496 480"/>
+            <path class="edge" d="M748 160 C 782 160 780 245 812 245"/>
+            <path class="edge" d="M748 480 C 782 480 780 285 812 285"/>
+            <path class="edge" d="M937 340 L 937 382"/>
+            <path class="edge" d="M937 532 L 937 576"/>
+          </svg>
+
+          <div class="stage-pill" style="left:18px;top:292px;width:140px"><svg class="i"><use href="#i-leaf"/></svg><div><div>需求 #2</div><div style="font-size:9.5px;color:var(--txt-3);font-weight:600">已受理 · 10:14</div></div></div>
+
+          <div class="cnode done" style="left:196px;top:186px;width:246px;height:232px">
+            <div class="cn-hd"><span class="cn-ic"><svg class="i"><use href="#i-spark"/></svg></span><span class="cn-name">规划 · Planning</span><span class="cn-chip ok"><svg class="i" style="width:10px;height:10px"><use href="#i-check"/></svg> 完成</span></div>
+            <span class="cn-model"><svg class="i" style="width:10px;height:10px"><use href="#i-zap"/></svg>claude-opus-4-6 · 推荐</span>
+            <div class="cn-meta">耗时 4m 12s · 10:14 – 10:18</div>
+            <div class="cn-desc">读取记忆与前序提案，<b style="color:var(--txt)">拆解出 3 个子任务</b>，产出实现计划与 8 条验收标准，并为后续阶段推荐模型。</div>
+            <div class="cn-art"><span>实现计划.md</span><span>子任务 ×3</span><span>验收标准 ×8</span></div>
+          </div>
+
+          <div class="cnode wait" style="left:496px;top:66px;width:252px;height:196px">
+            <div class="cn-hd"><span class="cn-ic"><svg class="i"><use href="#i-term"/></svg></span><span class="cn-name">开发实现</span><span class="cn-chip warn"><span class="dot pulse"></span> 等待确认</span></div>
+            <span class="cn-model"><svg class="i" style="width:10px;height:10px"><use href="#i-zap"/></svg>claude-opus-4-6 · 自定义</span>
+            <div class="cn-meta">已 21m · 其中等待 12m · 子任务 ②</div>
+            <div class="cn-desc">实现 session-store、限流计数与中间件接入。</div>
+            <div class="cn-note"><svg class="i" style="width:12px;height:12px"><use href="#i-db"/></svg>数据库选型待你回答 · 并行的测试线不受影响</div>
+          </div>
+
+          <div class="cnode run" style="left:496px;top:392px;width:252px;height:176px">
+            <div class="cn-hd"><span class="cn-ic"><svg class="i"><use href="#i-edit"/></svg></span><span class="cn-name">测试用例编写</span><span class="cn-chip run"><span class="dot pulse"></span> 执行中</span></div>
+            <span class="cn-model"><svg class="i" style="width:10px;height:10px"><use href="#i-zap"/></svg>claude-sonnet-4-5 · 推荐</span>
+            <div class="cn-meta">已 14m · 与开发并行</div>
+            <div class="cn-desc">依据 8 条验收标准编写 vitest 用例。</div>
+            <div class="cn-prog"><div class="bar progress"><b style="width:60%"></b></div>12 个用例 · 已覆盖鉴权模块</div>
+          </div>
+
+          <div class="cnode queued" style="left:812px;top:190px;width:250px;height:150px">
+            <div class="cn-hd"><span class="cn-ic"><svg class="i"><use href="#i-play"/></svg></span><span class="cn-name">测试执行</span><span class="cn-chip q">排队中</span></div>
+            <span class="cn-model"><svg class="i" style="width:10px;height:10px"><use href="#i-zap"/></svg>claude-haiku-4-5 · 轻量</span>
+            <div class="cn-meta">依赖 开发 ∥ 测试用例 汇合</div>
+            <div class="cn-desc">沙箱内运行全量测试并生成报告；失败即任务未完成。</div>
+            <div class="cn-art"><span>测试报告.md（计划）</span></div>
+          </div>
+
+          <div class="cnode queued" style="left:812px;top:382px;width:250px;height:150px">
+            <div class="cn-hd"><span class="cn-ic"><svg class="i"><use href="#i-shield"/></svg></span><span class="cn-name">验收对照</span><span class="cn-chip q">排队中</span></div>
+            <span class="cn-model"><svg class="i" style="width:10px;height:10px"><use href="#i-zap"/></svg>claude-sonnet-4-5 · 推荐</span>
+            <div class="cn-meta">当前预达成 2/8（由开发阶段）</div>
+            <div class="cn-desc">逐条核对验收标准；未达成项回溯修复后重验。</div>
+            <div class="cn-art"><span>验收报告（计划）</span></div>
+          </div>
+
+          <div class="stage-pill" style="left:812px;top:576px;width:250px"><svg class="i"><use href="#i-pr"/></svg><div><div>交付 · PR #14（计划）</div><div style="font-size:9.5px;color:var(--txt-3);font-weight:600">claude-haiku-4-5 · 记忆提案将生成</div></div></div>
+        </div></div>
+
+        <div class="strip shell"><div class="core inner">
+          <div class="strip-hd"><span class="chip chip-blue">选中阶段</span><span style="font-size:14px;font-weight:800">规划 · Planning</span><span class="meta">点击画布节点切换详情 · 规划产出的子任务与验收标准驱动后续所有阶段</span><span class="sp"></span><button class="btn btn-ghost btn-sm">重新规划</button><button class="btn btn-ghost btn-sm">更换模型</button></div>
+          <div class="strip-grid">
+            <div>
+              <div class="sg-h">阶段说明</div>
+              <div class="sg-desc">读取项目记忆与前序提案，将需求拆解为可执行的<b style="color:var(--txt)">具体子任务</b>，产出实现计划与验收标准；未决技术选型将以结构化提问转交用户。</div>
+              <div style="margin-top:12px">
+                <div class="sg-kv">状态<span class="v" style="color:var(--acc)">✓ 已完成</span></div>
+                <div class="sg-kv">模型<span class="v">claude-opus-4-6（推荐）</span></div>
+                <div class="sg-kv">耗时<span class="v">4m 12s</span></div>
+                <div class="sg-kv">Token 消耗<span class="v">38.2k in / 6.1k out</span></div>
+              </div>
+            </div>
+            <div>
+              <div class="sg-h">产物 ×4</div>
+              <div class="art-row"><svg class="i" style="width:13px;height:13px;color:var(--txt-3)"><use href="#i-term"/></svg><span class="an">实现计划.md</span><span class="am">2.4 KB · 查看</span></div>
+              <div class="art-row"><svg class="i" style="width:13px;height:13px;color:var(--txt-3)"><use href="#i-term"/></svg><span class="an">子任务 ×3</span><span class="am">进入开发队列</span></div>
+              <div class="art-row"><svg class="i" style="width:13px;height:13px;color:var(--txt-3)"><use href="#i-term"/></svg><span class="an">验收标准 ×8</span><span class="am">已定义</span></div>
+              <div class="art-row"><svg class="i" style="width:13px;height:13px;color:var(--txt-3)"><use href="#i-term"/></svg><span class="an">技术选型提问</span><span class="am">转 用户确认</span></div>
+            </div>
+            <div>
+              <div class="sg-h">验收标准 <span class="n">已达成 2/8 · 点击条目查看证据</span></div>
+              <div class="progress" style="width:200px;margin-bottom:10px"><b style="width:25%"></b></div>
+              <div class="ac-grid">
+                <div class="ac-row"><svg class="i"><use href="#i-check"/></svg><span><b>会话表结构迁移脚本</b>可通过 lint 与 dry-run</span><span class="src">达成 · 开发</span></div>
+                <div class="ac-row"><svg class="i"><use href="#i-check"/></svg><span><b>session-store 接口签名</b>与实现计划一致</span><span class="src">达成 · 开发</span></div>
+                <div class="ac-row"><span class="wt"></span><span>会话读写路径单测覆盖 <b>≥ 90%</b></span><span class="src">验收对照</span></div>
+                <div class="ac-row"><span class="wt"></span><span>限流计数 <b>TTL 过期行为</b>符合设计</span><span class="src">验收对照</span></div>
+                <div class="ac-row"><span class="wt"></span><span>旧会话数据<b>兼容迁移</b>无丢失</span><span class="src">测试执行</span></div>
+                <div class="ac-row"><span class="wt"></span><span>回滚开关可<b>一键降级</b>内存实现</span><span class="src">验收对照</span></div>
+                <div class="ac-row"><span class="wt"></span><span><b>pnpm test:ci</b> 全量通过</span><span class="src">测试执行</span></div>
+                <div class="ac-row"><span class="wt"></span><span>PR 描述含变更说明与依赖提示</span><span class="src">交付</span></div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================== 07 阶段与模型配置 -->
+<div class="frame">
+  <div class="frame-label"><span class="no">07</span><span class="name">阶段与模型配置</span><span class="desc">每个阶段可指定模型（推荐 + 自定义）· 开发 ∥ 测试用例并行开关 · 规划产出预览</span></div>
+  <div class="screen" id="s7">
+    <div class="app">
+      <aside class="side">
+        <div class="logo"><span class="mark"><svg class="i"><use href="#i-leaf"/></svg></span><span><span class="nm">Broccoli</span><span class="tag">CLOUD DEV OPS</span></span></div>
+        <a class="nav-item"><svg class="i"><use href="#i-grid"/></svg>仪表盘</a>
+        <a class="nav-item on"><svg class="i"><use href="#i-folder"/></svg>项目<span class="cnt">4</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-spark"/></svg>记忆库<span class="cnt">14</span></a>
+        <a class="nav-item"><svg class="i"><use href="#i-gauge"/></svg>用量与成本</a>
+        <div class="foot"><span class="av">T</span><div><div class="nm">Thomas Zhang</div><div class="st"><span class="dot"></span>BYO Key · 已连通</div></div></div>
+      </aside>
+      <div class="main">
+        <div class="crumb"><svg class="i" style="width:13px;height:13px"><use href="#i-folder"/></svg>项目 <svg class="i" style="width:12px;height:12px"><use href="#i-chev"/></svg> <b>acme/api-gateway</b> <svg class="i" style="width:12px;height:12px"><use href="#i-chev"/></svg> 设置 · 阶段与模型</div>
+        <div class="task-hd">
+          <div>
+            <div class="ttl-h">阶段与模型配置</div>
+            <div class="meta">
+              <span class="chip chip-gray">项目默认 · 新队列自动应用</span>
+              <span class="chip chip-green">推荐配置已启用 5/6</span>
+              <span class="chip chip-gray">上次修改 11-17</span>
+            </div>
+          </div>
+          <div class="acts"><button class="btn btn-ghost">恢复全部推荐</button><button class="btn btn-primary">保存修改<span class="bi"><svg class="i"><use href="#i-check"/></svg></span></button></div>
+        </div>
+
+        <div class="cfg-wrap">
+          <div>
+            <div class="stage-card">
+              <span class="si" style="background:var(--acc-dim);color:var(--acc)"><svg class="i"><use href="#i-spark"/></svg></span>
+              <div class="sinfo">
+                <div class="sn2">规划 <span class="en">PLANNING</span><span class="chip chip-blue" style="font-size:9px">产出子任务与验收标准</span></div>
+                <div class="sd">读取记忆与上下文，<b>将需求拆解为具体子任务</b>，生成实现计划、验收标准，并为后续阶段推荐模型。</div>
+                <div class="sa"><span>实现计划.md</span><span>子任务 ×N</span><span>验收标准 ×N</span></div>
+              </div>
+              <div class="model-pick">
+                <button class="model-sel">claude-opus-4-6<svg class="i"><use href="#i-chev-d"/></svg></button>
+                <span class="chip chip-green" style="height:22px;font-size:9.5px">推荐</span>
+              </div>
+            </div>
+
+            <div class="para-card">
+              <div class="para-hd"><div class="para-t"><svg class="i" style="width:15px;height:15px;color:var(--acc)"><use href="#i-zap"/></svg>开发实现 ∥ 测试用例编写 <span class="en">PARALLEL</span></div><span class="toggle on" style="margin-left:auto"></span></div>
+              <div class="para-d">两个阶段<b>并行执行、互不阻塞</b>：开发等待人工确认时，测试用例线继续推进；两者汇合后进入测试执行。关闭后按串行执行。</div>
+              <div class="para-viz">
+                <div class="pv-col"><div class="pv-bar dev"><span class="dot"></span>开发实现 · 等待确认 12m</div><div class="pv-bar tst"><span class="dot pulse"></span>测试用例编写 · 执行中 14m</div></div>
+                <span class="pv-arrow"><svg class="i"><use href="#i-arrow"/></svg></span>
+                <div class="pv-col" style="width:auto;flex:1"><div class="pv-bar run2">测试执行 · 待汇合后启动</div><div style="font-size:10px;color:var(--txt-3);font-weight:600">汇合条件：两侧均进入终态</div></div>
+              </div>
+            </div>
+
+            <div class="stage-card">
+              <span class="si" style="background:var(--amber-dim);color:var(--amber)"><svg class="i"><use href="#i-term"/></svg></span>
+              <div class="sinfo">
+                <div class="sn2">开发实现 <span class="en">DEVELOPMENT</span></div>
+                <div class="sd">按实现计划完成代码变更，遇到决策点抛出<b>结构化确认</b>；与测试用例编写并行。</div>
+                <div class="sa"><span>代码 diff</span><span>确认问答</span></div>
+              </div>
+              <div class="model-pick">
+                <button class="model-sel custom">claude-opus-4-6<svg class="i"><use href="#i-chev-d"/></svg></button>
+                <span class="chip chip-amber" style="height:22px;font-size:9.5px">自定义 · 原推荐 sonnet-4-5</span>
+              </div>
+            </div>
+
+            <div class="stage-card">
+              <span class="si" style="background:var(--acc-dim);color:var(--acc)"><svg class="i"><use href="#i-edit"/></svg></span>
+              <div class="sinfo">
+                <div class="sn2">测试用例编写 <span class="en">TEST DESIGN</span></div>
+                <div class="sd">依据验收标准逐条编写测试用例，<b>与开发共享计划上下文</b>，不等待开发完成。</div>
+                <div class="sa"><span>测试用例集</span><span>覆盖率预估</span></div>
+              </div>
+              <div class="model-pick">
+                <button class="model-sel">claude-sonnet-4-5<svg class="i"><use href="#i-chev-d"/></svg></button>
+                <span class="chip chip-green" style="height:22px;font-size:9.5px">推荐</span>
+              </div>
+            </div>
+
+            <div class="stage-card">
+              <span class="si"><svg class="i"><use href="#i-play"/></svg></span>
+              <div class="sinfo">
+                <div class="sn2">测试执行 <span class="en">TEST RUN</span></div>
+                <div class="sd">沙箱内运行全量测试并生成报告；<b>失败即任务未完成</b>，进入失败策略。</div>
+                <div class="sa"><span>测试报告.md</span><span>覆盖率报告</span></div>
+              </div>
+              <div class="model-pick">
+                <button class="model-sel">claude-haiku-4-5<svg class="i"><use href="#i-chev-d"/></svg></button>
+                <span class="chip chip-green" style="height:22px;font-size:9.5px">推荐 · 轻量</span>
+              </div>
+            </div>
+
+            <div class="stage-card">
+              <span class="si"><svg class="i"><use href="#i-shield"/></svg></span>
+              <div class="sinfo">
+                <div class="sn2">验收对照 <span class="en">ACCEPTANCE</span></div>
+                <div class="sd">逐条核对验收标准并记录证据，<b>未达成项回溯修复</b>后重验，全部达成才可交付。</div>
+                <div class="sa"><span>验收报告</span><span>达成证据链接</span></div>
+              </div>
+              <div class="model-pick">
+                <button class="model-sel">claude-sonnet-4-5<svg class="i"><use href="#i-chev-d"/></svg></button>
+                <span class="chip chip-green" style="height:22px;font-size:9.5px">推荐</span>
+              </div>
+            </div>
+
+            <div class="stage-card" style="margin-bottom:0">
+              <span class="si"><svg class="i"><use href="#i-pr"/></svg></span>
+              <div class="sinfo">
+                <div class="sn2">交付 <span class="en">DELIVERY</span></div>
+                <div class="sd">推送分支、开出<b>堆叠 PR</b>（含变更说明），并触发生成记忆提案。</div>
+                <div class="sa"><span>PR</span><span>记忆提案 ×N</span></div>
+              </div>
+              <div class="model-pick">
+                <button class="model-sel">claude-haiku-4-5<svg class="i"><use href="#i-chev-d"/></svg></button>
+                <span class="chip chip-green" style="height:22px;font-size:9.5px">推荐 · 轻量</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="rail">
+            <div class="plan-out shell"><div class="core inner">
+              <div class="sec-hd" style="margin-bottom:12px"><span class="t" style="font-size:13.5px">规划产出预览 · 需求 #2</span><span class="chip chip-blue" style="margin-left:auto">由规划阶段生成</span></div>
+              <div class="po-quote">需求原文：「<b>引入会话持久化存储，支持限流计数</b>」→ 规划拆解出 3 个具体子任务：</div>
+              <div class="po-task"><span class="no">①</span><span class="tt">设计会话表结构与迁移脚本</span><span class="chip chip-green" style="font-size:9.5px">已完成</span></div>
+              <div class="po-task"><span class="no">②</span><span class="tt">实现 session-store 与限流计数</span><span class="chip chip-amber" style="font-size:9.5px"><span class="dot pulse"></span> 等待确认</span></div>
+              <div class="po-task"><span class="no">③</span><span class="tt">中间件接入 + 回滚开关</span><span class="chip chip-blue" style="font-size:9.5px">排队中</span></div>
+              <div class="sg-h" style="margin-top:16px">验收标准 <span class="n">已达成 2/8</span></div>
+              <div class="ac-grid" style="grid-template-columns:1fr">
+                <div class="ac-row"><svg class="i"><use href="#i-check"/></svg><span>会话表结构<b>迁移脚本</b>通过 lint 与 dry-run</span></div>
+                <div class="ac-row"><svg class="i"><use href="#i-check"/></svg><span>session-store <b>接口签名</b>与计划一致</span></div>
+                <div class="ac-row"><span class="wt"></span><span>读写路径单测覆盖 <b>≥ 90%</b> · 其余 5 条</span></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" style="margin-top:12px;width:100%;justify-content:center">在执行画布中查看全部 →</button>
+            </div></div>
+
+            <div class="rec-note shell"><div class="core inner" style="display:flex;gap:10px"><svg class="i" style="width:14px;height:14px;color:var(--acc);margin-top:2px;flex:none"><use href="#i-zap"/></svg><div><b>推荐策略</b>：由平台按阶段任务类型静态映射，并结合项目记忆中的模型偏好；<b>自定义</b>随项目保存，提交队列时可临时覆盖。BYO Key 下各阶段模型费用直接计入你的账户。</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>
