@@ -118,7 +118,8 @@ export async function startQueuedRuns(): Promise<number> {
       .where(and(eq(taskRuns.projectId, project.id), inArray(taskRuns.state, ["preparing", "running", "wait_confirm"])));
     if (activeCount > 0) continue;
 
-    // 失败策略 pause：队列中存在更早的失败/挂起需求且未解决 → 阻塞（FR-D6）
+    // 失败策略 pause：队列中存在更早的失败需求且未解决 → 阻塞（FR-D6）。
+    // 挂起（suspended）不阻塞：设计上挂起即「队列继续后续任务」（AC-D5）
     if (project.failurePolicy === "pause") {
       const [{ count: blocked }] = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -126,7 +127,7 @@ export async function startQueuedRuns(): Promise<number> {
         .where(
           and(
             eq(requirements.projectId, project.id),
-            inArray(requirements.status, ["failed", "suspended"]),
+            eq(requirements.status, "failed"),
             sql`${requirements.seq} < ${requirement.seq}`,
           ),
         );

@@ -15,7 +15,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!user) return unauthorized();
   const { id } = await params;
   const project = await ownedProject(user.id, id);
-  if (!project) return bad("项目不存在", 404, "NOT_FOUND");
+  if (!project || project.status === "deleted") return bad("项目不存在", 404, "NOT_FOUND");
   const reqs = await db.select().from(requirements).where(eq(requirements.projectId, id)).orderBy(asc(requirements.seq));
   const runs = reqs.length
     ? await db
