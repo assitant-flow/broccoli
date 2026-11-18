@@ -177,7 +177,10 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
 
   /* ============ 画布布局：可拖拽 + localStorage 持久化 ============ */
   const [pos, setPos] = useState<Record<string, { x: number; y: number; w?: number }>>(DEFAULT_LAYOUT);
-  const dragRef = useRef<{ key: string; sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const dragRef = useRef<{ key: string; sx: number; sy: number; ox: number; oy: number; moved?: boolean } | null>(null);
+  const canvasWrapRef = useRef<HTMLDivElement | null>(null);
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const suppressClickRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -194,22 +197,32 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
 
   function onNodePointerDown(e: React.PointerEvent, key: string) {
     e.preventDefault();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* 指针可能已释放 */ }
     dragRef.current = { key, sx: e.clientX, sy: e.clientY, ox: pos[key].x, oy: pos[key].y };
+    setDraggingKey(key);
   }
   function onNodePointerMove(e: React.PointerEvent) {
     const d = dragRef.current;
     if (!d || d.key !== (e.currentTarget as HTMLElement).dataset.nodeKey) return;
+    const dx = e.clientX - d.sx;
+    const dy = e.clientY - d.sy;
+    if (!d.moved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) d.moved = true;
+    // 边界跟随画布实际宽高（大屏可一直拖到右缘；容器可滚动区域之外不允许）
+    const cw = canvasWrapRef.current?.clientWidth ?? 1110;
+    const ch = canvasWrapRef.current?.clientHeight ?? 620;
     const w = DEFAULT_LAYOUT[d.key]?.w ?? 250;
-    const x = Math.max(0, Math.min(1110 - w, d.ox + e.clientX - d.sx));
-    const y = Math.max(0, Math.min(560, d.oy + e.clientY - d.sy));
+    const x = Math.max(0, Math.min(cw - w - 6, d.ox + dx));
+    const y = Math.max(0, Math.min(ch - 64, d.oy + dy));
     setPos((p) => ({ ...p, [d.key]: { x, y } }));
   }
   function onNodePointerUp(e: React.PointerEvent) {
     const d = dragRef.current;
     if (!d) return;
-    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* 指针可能已被浏览器释放 */ }
     dragRef.current = null;
+    setDraggingKey(null);
+    // 拖拽结束后的 click 事件不改变选中态（避免拖完边框闪变）
+    suppressClickRef.current = d.moved ? d.key : null;
     setPos((p) => { persistPos(p); return p; });
   }
   function resetLayout() {
@@ -407,11 +420,11 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
             <button className="btn btn-ghost btn-sm" onClick={resetLayout} title="恢复默认画布布局">重置布局</button>
             <Link className="btn btn-ghost btn-sm" href={`/projects/${data?.project?.id}`}><I name="i-sliders" size={13} />阶段与模型配置</Link>
           </div>
-          <div className="shell"><div className="canvas-wrap">
-            <svg className="edges" width="1110" height="620" viewBox="0 0 1110 620">
+          <div className="shell"><div className="canvas-wrap" ref={canvasWrapRef}>
+            <svg className="edges" width="100%" height="620">
               {edges.map((e, i) => <path key={i} className={e.c} d={e.d} />)}
             </svg>
-            <div className="stage-pill" style={{ left: pos.entry.x, top: pos.entry.y, width: pos.entry.w, cursor: "grab", touchAction: "none", userSelect: "none" }} {...dragProps("entry")}>
+            <div className={`stage-pill ${draggingKey === "entry" ? "dragging" : ""}`} style={{ left: pos.entry.x, top: pos.entry.y, width: pos.entry.w, cursor: "grab", touchAction: "none", userSelect: "none" }} {...dragProps("entry")}>
               <I name="i-leaf" size={15} />
               <div><div>需求 #{data?.requirement?.seq}</div><div className="sub">已受理 · {fmtTime(run?.startedAt)}</div></div>
             </div>
@@ -424,7 +437,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
               const criteriaHere = data?.criteria.filter((c) => c.verifyStage === t) ?? [];
               const failedHere = criteriaHere.filter((c) => c.status === "failed").length;
               return (
-                <div key={t} className={`cnode ${nodeCls(s.state)} ${selected === t ? "sel" : ""}`} style={{ left: layout.x, top: layout.y, width: layout.w, cursor: "grab", touchAction: "none", userSelect: "none" }} {...dragProps(t)} onClick={() => setSelected(t)}>
+                <div key={t} className={`cnode ${nodeCls(s.state)} ${selected === t && draggingKey !== t ? "sel" : ""} ${draggingKey === t ? "dragging" : ""}`} style={{ left: layout.x, top: layout.y, width: layout.w, cursor: "grab", touchAction: "none", userSelect: "none" }} {...dragProps(t)} onClick={() => { if (suppressClickRef.current === t) { suppressClickRef.current = null; return; } setSelected(t); }}>
                   <div className="cn-hd">
                     <span className="cn-ic"><I name={STAGE_ICONS[t]} size={14} /></span>
                     <span className="cn-name">{STAGE_NAMES[t]}</span>
@@ -453,7 +466,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                 </div>
               );
             })}
-            <div className="stage-pill" style={{ left: pos.delivery.x, top: pos.delivery.y, width: pos.delivery.w, cursor: "grab", touchAction: "none", userSelect: "none" }} {...dragProps("delivery")}>
+            <div className={`stage-pill ${draggingKey === "delivery" ? "dragging" : ""}`} style={{ left: pos.delivery.x, top: pos.delivery.y, width: pos.delivery.w, cursor: "grab", touchAction: "none", userSelect: "none" }} {...dragProps("delivery")}>
               <I name="i-pr" size={15} />
               <div>
                 <div>交付 · {data?.prs.length ? `PR #${data.prs[0].number} 已开出` : "PR（待验收达成）"}</div>

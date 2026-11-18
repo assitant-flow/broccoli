@@ -400,3 +400,8 @@ input, textarea, select { font: inherit; color: var(--txt); }
   border: 1px solid var(--line); margin-bottom: 8px; cursor: pointer; transition: all 0.4s var(--ease); }
 .repo-list .rrow:hover { border-color: rgba(52, 211, 153, 0.4); }
 .repo-list .rrow .rn { font-family: var(--mono); font-size: 12.5px; font-weight: 700; flex: 1; }
+
+/* 拖拽中的节点：去除过渡与选中描边（防边框视觉变化），grabbing 光标 */
+.cnode.dragging,
+.stage-pill.dragging { transition: none !important; outline: none !important; cursor: grabbing !important; }
+.cnode.dragging:hover { border-color: var(--line-2); }
