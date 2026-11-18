@@ -59,7 +59,7 @@ pnpm smoke
 | GitHub（真实集成） | `originKind=github`：真实 clone/push（extraheader 注入 token，HTTP/1.1 防挂起）+ REST 开 PR/合并/关闭/Issues 同步。**已用真实仓库 AlpherJang/broccoli-demo 完成 13/13 端到端验证（pnpm verify:github）**；OAuth 登录流程待用户注册 OAuth App，当前为 PAT 模式 | OAuth App 登录流程 |
 | 邮件（Resend/SMTP） | OutboxMailer 落盘 `.data/outbox/*.eml` | 换 Resend 适配器 |
 | GitHub Issues | 真实 REST 同步（github origin：拉取 open issues 镜像、PR 开出后真实关闭回写）；本地模式为模拟落库 | — |
-| OAuth | 本地账号体系（scrypt + HMAC 会话） | GitHub OAuth 接入 |
+| OAuth 登录（FR-A3） | **已实现**：`/api/auth/github/start|callback|status` —— state CSRF 校验、code 换 token、find-or-create 用户、OAuth token 加密入库（github origin 免配 PAT）、会话直登；登录页按钮未配置时自动隐藏 | 完整回环需真实 OAuth App（注册清单见下） |
 
 ## 关键实现位置
 
