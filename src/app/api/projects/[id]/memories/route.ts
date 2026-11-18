@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { memoryItems, memoryProposals, memoryInjections, projects } from "@/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { env } from "@/lib/env";
 import { getSessionUser, unauthorized } from "@/lib/auth";
 import { ok, bad } from "@/lib/api";
 
@@ -23,9 +24,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ? await db.select().from(memoryInjections).where(inArray(memoryInjections.proposalId, proposalIds))
     : [];
   const injectedCount = (proposalId: string) => injections.filter((i) => i.proposalId === proposalId).length;
+  // 注入模式（v2β FR-G11）：确认记忆+待确认提案总数超阈值 → 检索模式（相关性 top-K），否则全量注入
+  const totalMem = items.filter((i) => i.status === "confirmed").length + proposals.filter((p) => p.status === "pending").length;
+  const injectionMode = totalMem > env.memoryInjectThreshold ? "retrieval" : "full";
   return ok({
     items,
     proposals: proposals.map((p) => ({ ...p, injectedCount: injectedCount(p.id) })),
+    injectionMode,
   });
 }
 

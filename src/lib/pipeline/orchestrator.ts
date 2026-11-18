@@ -31,6 +31,7 @@ import { resolveStageModels, type StageModel } from "@/lib/models";
 import { notify } from "@/lib/notify";
 import { slugify } from "@/lib/engine/types";
 import { getSandbox } from "@/lib/sandbox";
+import { selectMemoriesForInjection } from "@/lib/memory-retrieval";
 
 /** github origin 的 git 鉴权参数（token 解析：平台 env → 用户 PAT；design §12 窗口注入） */
 async function originOpts(project: typeof projects.$inferSelect): Promise<GitOriginOpts> {
@@ -242,7 +243,7 @@ export async function startQueuedRuns(): Promise<number> {
       })),
     );
 
-    // 记忆注入：已确认记忆 + 待确认提案（提案即注入，FR-G3）+ 依赖追溯落库（FR-G6）
+    // 记忆注入（FR-G1/G3/G10 + v2β 检索优化 FR-G11）：已确认记忆 + 待确认提案 + 用户偏好
     const items = await db
       .select()
       .from(memoryItems)
@@ -251,26 +252,43 @@ export async function startQueuedRuns(): Promise<number> {
       .select()
       .from(memoryProposals)
       .where(and(eq(memoryProposals.projectId, project.id), eq(memoryProposals.status, "pending")));
-    // 用户级偏好记忆（v2α，FR-G10）：跨项目注入
+    // 用户级偏好记忆（v2α，FR-G10）：跨项目恒注入
     const userPrefs = await db
       .select()
       .from(memoryItems)
       .where(and(eq(memoryItems.userId, project.userId), eq(memoryItems.status, "confirmed")));
+    // 记忆检索优化（v2β，FR-G11）：超过阈值按相关性 top-K 注入，偏好/提案恒注入
+    const retrieval = await selectMemoriesForInjection({
+      query: `${requirement.title} ${requirement.description}`,
+      preferences: userPrefs.map((i) => ({ id: i.id, content: i.content })),
+      proposals: proposals.map((p) => ({ id: p.id, content: p.content })),
+      items: items.map((i) => ({ id: i.id, content: i.content })),
+    });
     const injections = [
-      ...userPrefs.map((i) => `【个人偏好】${i.content}`),
-      ...items.map((i) => `【记忆·${i.type}】${i.content}`),
-      ...proposals.map((p) => `【提案·${p.type}】${p.content}`),
+      ...retrieval.selected.map((m) => {
+        const pref = userPrefs.find((u) => u.id === m.id);
+        if (pref) return `【个人偏好】${m.content}`;
+        const prop = proposals.find((p) => p.id === m.id);
+        if (prop) return `【提案·${prop.type}】${m.content}`;
+        const item = items.find((i) => i.id === m.id);
+        return `【记忆·${item?.type ?? "fact"}】${m.content}`;
+      }),
     ];
     // 仓库约定文件协同（FR-G8）：加载 CLAUDE.md 并注入上下文
     const claudeMd = await readRepoFile(project.id, "CLAUDE.md");
     if (claudeMd?.trim()) injections.push(`【仓库约定·CLAUDE.md】${claudeMd.trim().slice(0, 400)}`);
+    // 注入依赖追溯落库（FR-G6）——仅记录实际注入的条目
+    const injectedIds = new Set(retrieval.selected.map((m) => m.id));
     for (const item of [...userPrefs, ...items]) {
-      await db.insert(memoryInjections).values({ itemId: item.id, targetRunId: run.id });
+      if (injectedIds.has(item.id)) await db.insert(memoryInjections).values({ itemId: item.id, targetRunId: run.id });
     }
     for (const p of proposals) {
-      await db.insert(memoryInjections).values({ proposalId: p.id, targetRunId: run.id });
+      if (injectedIds.has(p.id)) await db.insert(memoryInjections).values({ proposalId: p.id, targetRunId: run.id });
     }
-    await db.update(taskRuns).set({ snapshot: { injections } }).where(eq(taskRuns.id, run.id));
+    await db.update(taskRuns).set({ snapshot: { injections, memoryRetrieval: { mode: retrieval.mode, excluded: retrieval.excluded, fallbackReason: retrieval.fallbackReason } } }).where(eq(taskRuns.id, run.id));
+    if (retrieval.mode !== "full") {
+      await logLine(run.id, null, "info", `🧠 记忆检索模式（${retrieval.mode}）：注入 ${retrieval.selected.length} 条，按相关性排除 ${retrieval.excluded} 条${retrieval.fallbackReason ? ` · ${retrieval.fallbackReason}` : ""}`);
+    }
 
     await db.update(containerLeases).set({ state: "active" }).where(eq(containerLeases.id, lease.id));
     await db.update(taskRuns).set({ state: "running" }).where(eq(taskRuns.id, run.id));

@@ -21,6 +21,7 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
   const [busy, setBusy] = useState(false);
   const [prefs, setPrefs] = useState<{ id: string; content: string }[]>([]);
   const [prefDraft, setPrefDraft] = useState("");
+  const [mode, setMode] = useState<"full" | "retrieval">("full");
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -28,7 +29,7 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
 
   useEffect(() => {
     if (!id) return;
-    const load = () => api<{ items: Item[]; proposals: Proposal[] }>(`/api/projects/${id}/memories`).then((d) => { setItems(d.items); setProposals(d.proposals); }).catch(() => {});
+    const load = () => api<{ items: Item[]; proposals: Proposal[]; injectionMode: "full" | "retrieval" }>(`/api/projects/${id}/memories`).then((d) => { setItems(d.items); setProposals(d.proposals); setMode(d.injectionMode); }).catch(() => {});
     load();
     const loadPrefs = () => api<{ id: string; content: string }[]>("/api/user/preferences").then(setPrefs).catch(() => {});
     loadPrefs();
@@ -117,7 +118,11 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
       <div className="mem-hd">
         <div>
           <div className="t">记忆库</div>
-          <div className="mono" style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 5 }}>执行前自动注入 · 确认决定永久入库 · 否决可追溯</div>
+          <div className="mono" style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 5, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span>执行前自动注入 · 确认决定永久入库 · 否决可追溯</span>
+            {mode === "retrieval" && <span className="chip chip-blue">检索模式 · 相关性 top-K（v2β FR-G11）</span>}
+            {mode === "full" && <span className="chip chip-gray">全量注入（记忆未超阈值）</span>}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <span className="chip chip-green">已确认 {confirmed.length}</span>
