@@ -25,7 +25,7 @@ import { env, STAGE_TYPES, type StageType } from "@/lib/env";
 import { getEngine } from "@/lib/engine";
 import type { StageContext, StageOutput } from "@/lib/engine/types";
 import { StageFailure } from "@/lib/engine/types";
-import { ensureProjectRepos, workPath, checkoutBranchFrom, pushBranch, diffStat, readRepoFile, checkoutExisting, mergeBranch, type GitOriginOpts } from "@/lib/git";
+import { ensureProjectRepos, workPath, checkoutBranchFrom, pushBranch, diffStat, readRepoFile, checkoutExisting, mergeBranch, branchExistsOnOrigin, type GitOriginOpts } from "@/lib/git";
 import { resolveGithubToken, createPullRequest, mergePullRequest, closePullRequest, closeIssue } from "@/lib/github";
 import { resolveStageModels, type StageModel } from "@/lib/models";
 import { notify } from "@/lib/notify";
@@ -185,8 +185,8 @@ export async function startQueuedRuns(): Promise<number> {
       .where(and(eq(containerLeases.userId, project.userId), ne(containerLeases.state, "released")));
     if (leases >= env.maxConcurrency) continue;
 
-    // 原子认领
-    const baseBranch = run.baseOverride ?? project.lastSuccessBranch ?? project.defaultBranch;
+    // 原子认领（base 指针悬空防御：origin 上不存在时回落默认分支）
+    let baseBranch = run.baseOverride ?? project.lastSuccessBranch ?? project.defaultBranch;
     const branch = `broccoli/${requirement.seq}-${slugify(requirement.title)}`;
     const [claimed] = await db
       .update(taskRuns)
@@ -205,6 +205,11 @@ export async function startQueuedRuns(): Promise<number> {
     try {
       const origin = await originOpts(project);
       await ensureProjectRepos(project.id, {}, origin);
+      if (!(await branchExistsOnOrigin(project.id, baseBranch, origin))) {
+        await logLine(run.id, null, "warn", `⚠ base 分支 ${baseBranch} 在 origin 不存在（环境重建后指针悬空）→ 回落 ${project.defaultBranch}`);
+        baseBranch = project.defaultBranch;
+        await db.update(taskRuns).set({ baseBranch }).where(eq(taskRuns.id, run.id));
+      }
       await checkoutBranchFrom(project.id, branch, baseBranch, origin);
       // 沙箱就绪（docker 模式：基础设施 + 项目容器；失败回落宿主执行并记录）
       const sbx = await getSandbox();

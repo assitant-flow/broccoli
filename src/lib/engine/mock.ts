@@ -16,7 +16,7 @@ import {
  * 用于无 Anthropic key / 无 GitHub 授权环境下的端到端演示（BROCCOLI_ENGINE=mock）。
  */
 
-const ARTIFACT_ROOT = path.join(process.cwd(), env.dataDir, "artifacts");
+const ARTIFACT_ROOT = path.resolve(process.cwd(), env.dataDir, "artifacts");
 
 async function writeArtifact(runId: string, name: string, content: string): Promise<string> {
   const key = path.join(runId, name);

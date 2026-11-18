@@ -31,14 +31,23 @@ services:
       BROCCOLI_ENGINE: ${BROCCOLI_ENGINE:-mock}
       BROCCOLI_DATA_DIR: /app/.data
       BROCCOLI_SITE_URL: ${BROCCOLI_SITE_URL:-http://localhost:3000}
-      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      # LLM router 在宿主机时，容器内需用 host.docker.internal 访问
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-http://host.docker.internal:1980}
       ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "3000:3000"
     volumes:
       - broccoli-data:/app/.data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
 
 volumes:
   broccoli-pgdata:

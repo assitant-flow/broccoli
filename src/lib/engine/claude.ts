@@ -22,23 +22,33 @@ interface Msg {
 }
 
 async function callClaude(key: string, model: string, system: string, messages: Msg[], maxTokens = 4000): Promise<string> {
-  const res = await fetch(`${env.anthropicBaseUrl}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": key,
-      authorization: `Bearer ${key}`,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({ model, max_tokens: maxTokens, system, messages }),
-    signal: AbortSignal.timeout(180000),
-  });
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new StageFailure(`Anthropic API 调用失败（${res.status}）：${detail.slice(0, 300)}`);
+  // 网络层重试（fetch failed / 超时等瞬时抖动重试 2 次；HTTP 业务错误不重试）
+  let lastNetErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${env.anthropicBaseUrl}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": key,
+          authorization: `Bearer ${key}`,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({ model, max_tokens: maxTokens, system, messages }),
+        signal: AbortSignal.timeout(180000),
+      });
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new StageFailure(`Anthropic API 调用失败（${res.status}）：${detail.slice(0, 300)}`);
+      }
+      const data = (await res.json()) as { content: { type: string; text?: string }[] };
+      return data.content.filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    } catch (err) {
+      if (err instanceof StageFailure) throw err; // HTTP 业务错误直接抛出
+      lastNetErr = err; // 网络抖动 → 重试
+    }
   }
-  const data = (await res.json()) as { content: { type: string; text?: string }[] };
-  return data.content.filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+  throw new StageFailure(`LLM 网络调用失败（重试 2 次后）：${String(lastNetErr).slice(0, 160)}`);
 }
 
 function extractJson<T>(text: string): T {

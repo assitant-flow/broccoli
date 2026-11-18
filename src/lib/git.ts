@@ -9,7 +9,7 @@ const run = promisify(execFile);
 /** 本地 git 层：以裸仓模拟 GitHub origin（demo 模式，AC-F1 的真实分支/堆叠/diff 均真实执行） */
 
 export function projectRepoDir(projectId: string) {
-  return path.join(process.cwd(), env.dataDir, "repos", projectId);
+  return path.resolve(process.cwd(), env.dataDir, "repos", projectId);
 }
 
 export function originPath(projectId: string) {
@@ -69,31 +69,41 @@ export async function ensureProjectRepos(projectId: string, seedFiles: Record<st
     .access(path.join(work, ".git"))
     .then(() => true)
     .catch(() => false);
-  if (workExists) return;
+  if (workExists) {
+    // 复用既有工作区：仍需保证仓库级身份（历史失败遗留的半初始化目录可能缺配置）
+    await ensureIdentity(work);
+    return;
+  }
 
   if (opts?.remoteUrl) {
     // 真实 GitHub 仓库：clone 远程（token 仅经 extraheader 传入；HTTP/1.1 + 防挂起 + 重试）
     await fs.mkdir(work, { recursive: true });
     await gitNet(work, opts.token, ["clone", opts.remoteUrl, "."], 180000);
-    await git(work, "config", "user.email", "agent@broccoli.dev");
-    await git(work, "config", "user.name", "Broccoli Agent");
+    await ensureIdentity(work);
   } else {
     const origin = originPath(projectId);
     await git(dir, "init", "--bare", "--initial-branch=main", origin);
     await fs.mkdir(work, { recursive: true });
     await git(work, "clone", origin, ".");
-    // 仓库级身份必须先于任何 commit（CI runner 无全局 git 身份）
-    await git(work, "config", "user.email", "agent@broccoli.dev");
-    await git(work, "config", "user.name", "Broccoli Agent");
-    for (const [rel, content] of Object.entries(seedFiles)) {
-      const p = path.join(work, rel);
-      await fs.mkdir(path.dirname(p), { recursive: true });
-      await fs.writeFile(p, content);
+    // 仓库级身份必须先于任何 commit（CI runner / 容器无全局 git 身份）
+    await ensureIdentity(work);
+    // 调度器重建工作区时 seedFiles 为空：只建环境，不产生空提交（修复 compose 下 commit 空树失败）
+    if (Object.keys(seedFiles).length > 0) {
+      for (const [rel, content] of Object.entries(seedFiles)) {
+        const p = path.join(work, rel);
+        await fs.mkdir(path.dirname(p), { recursive: true });
+        await fs.writeFile(p, content);
+      }
+      await git(work, "add", "-A");
+      const committed = await commitAll(projectId, "chore: 初始化项目骨架");
+      if (committed) await git(work, "push", "origin", "main");
     }
-    await git(work, "add", "-A");
-    await git(work, "commit", "-m", "chore: 初始化项目骨架");
-    await git(work, "push", "origin", "main");
   }
+}
+
+async function ensureIdentity(work: string): Promise<void> {
+  await git(work, "config", "user.email", "agent@broccoli.dev").catch(() => {});
+  await git(work, "config", "user.name", "Broccoli Agent").catch(() => {});
 }
 
 export async function currentBranch(projectId: string): Promise<string> {
@@ -176,5 +186,22 @@ export async function readRepoFile(projectId: string, rel: string): Promise<stri
     return await fs.readFile(path.join(workPath(projectId), rel), "utf8");
   } catch {
     return null;
+  }
+}
+
+/** origin 上是否存在该分支（base 指针悬空防御：重建环境后 last_success_branch 可能丢失） */
+export async function branchExistsOnOrigin(projectId: string, ref: string, opts?: GitOriginOpts): Promise<boolean> {
+  const work = workPath(projectId);
+  await gitNet(work, opts?.token, ["fetch", "origin"], 60000).catch(() => {});
+  try {
+    await git(work, "show-ref", "--verify", "--quiet", `refs/remotes/origin/${ref}`);
+    return true;
+  } catch {
+    try {
+      await git(work, "show-ref", "--verify", "--quiet", `refs/heads/${ref}`);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

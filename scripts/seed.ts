@@ -11,8 +11,20 @@ import { ensureStageModelDefaults } from "../src/lib/models";
 import { initialProjectAnalysis } from "../src/lib/pipeline/orchestrator";
 
 async function main() {
-  // 1. 演示账号
+  // 幂等初始化模式（compose/生产默认）：已有演示账号 → 直接跳过（保留全部数据）；
+  // SEED_RESET=1 时强制重置（本地开发循环用）
+  const force = process.env.SEED_RESET === "1";
   const email = "thomas@broccoli.dev";
+  const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  if (existingUser && !force) {
+    console.log("• 已初始化（演示账号存在）——跳过 seed，数据保持不变。重置请用 SEED_RESET=1 pnpm seed");
+    return;
+  }
+  if (existingUser && force) {
+    console.log("• SEED_RESET=1 —— 清理并重建演示数据");
+  }
+
+  // 1. 演示账号
   let [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (!user) {
     [user] = await db
@@ -29,7 +41,7 @@ async function main() {
   for (const p of old) {
     await db.delete(projects).where(eq(projects.id, p.id));
   }
-  console.log("• 已清理旧项目");
+  console.log(`• 已清理旧项目（${old.length} 个）`);
 
   // 2. 项目 A：失败暂停 + 5 需求（覆盖 确认/修复/串行 堆叠）
   const [projA] = await db

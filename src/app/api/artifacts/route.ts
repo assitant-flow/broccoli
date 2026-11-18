@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const runId = url.searchParams.get("runId");
   const name = url.searchParams.get("name");
   if (!runId || !name || name.includes("..") || name.includes("/")) return bad("runId 与 name 必填");
-  const p = path.join(process.cwd(), env.dataDir, "artifacts", runId, name);
+  const p = path.resolve(process.cwd(), env.dataDir, "artifacts", runId, name);
   try {
     const content = await fs.readFile(p, "utf8");
     return new Response(content, { headers: { "content-type": "text/plain; charset=utf-8" } });

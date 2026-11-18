@@ -28,7 +28,7 @@ export async function notify(params: {
     return false; // 重复通知（AC-E4 防轰炸）
   }
 
-  const dir = path.join(process.cwd(), env.dataDir, "outbox");
+  const dir = path.resolve(process.cwd(), env.dataDir, "outbox");
   await fs.mkdir(dir, { recursive: true });
   const titleMap: Record<NotifyType, string> = {
     wait_confirm: "⏸ 任务等待你的确认",

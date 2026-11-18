@@ -17,6 +17,8 @@ RUN pnpm exec tsc --noEmit && pnpm build
 
 FROM base AS runtime
 WORKDIR /app
+# git（Runner 侧仓库操作）与 curl（容器 healthcheck）
+RUN apk add --no-cache git curl
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=build /app/.next ./.next
@@ -26,5 +28,9 @@ COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=build /app/src ./src
 COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/tsconfig.json ./tsconfig.json
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 3000
-CMD ["pnpm", "start"]
+HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
+  CMD curl -sf http://localhost:3000/api/health || exit 1
+ENTRYPOINT ["docker-entrypoint.sh"]
