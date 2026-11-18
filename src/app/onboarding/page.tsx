@@ -9,12 +9,29 @@ import { api } from "@/lib/client";
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [key, setKey] = useState("");
+  const [ghToken, setGhToken] = useState("");
+  const [ghResult, setGhResult] = useState<{ ok: boolean; detail: string } | null>(null);
   const [testResult, setTestResult] = useState<{ ok: boolean; detail: string } | null>(null);
   const [policy, setPolicy] = useState<"pause" | "skip_continue">("pause");
   const [name, setName] = useState("");
+  const [originKind, setOriginKind] = useState<"local" | "github">("local");
+  const [repoFullName, setRepoFullName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const router = useRouter();
+
+  async function saveGithubToken() {
+    setBusy(true);
+    setErr("");
+    try {
+      await api("/api/credentials", { method: "PUT", body: JSON.stringify({ provider: "github", secret: ghToken }) });
+      setGhResult({ ok: true, detail: "GitHub PAT 已加密保存（repo scope）" });
+    } catch (e) {
+      setGhResult({ ok: false, detail: String((e as Error).message) });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveAndTest() {
     setBusy(true);
@@ -44,7 +61,12 @@ export default function OnboardingPage() {
     try {
       const p = await api<{ id: string }>("/api/projects", {
         method: "POST",
-        body: JSON.stringify({ name: name || "my-api", failurePolicy: policy }),
+        body: JSON.stringify({
+          name: originKind === "local" ? name || "my-api" : undefined,
+          originKind,
+          repoFullName: originKind === "github" ? repoFullName.trim() : undefined,
+          failurePolicy: policy,
+        }),
       });
       router.push(`/projects/${p.id}`);
     } catch (e) {
@@ -73,11 +95,23 @@ export default function OnboardingPage() {
 
         <div className="shell"><div className="core inner" style={{ padding: "22px 24px" }}>
           <div style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-            <I name="i-check" size={15} style={{ color: "var(--acc)" }} />GitHub · 代码通道（MVP 演示）
+            <I name="i-check" size={15} style={{ color: "var(--acc)" }} />GitHub · 代码通道
           </div>
-          <div className="sec-note" style={{ marginTop: 0 }}>
+          <div className="field">
+            <label>GitHub Personal Access Token（repo scope；真实 clone / push / PR 使用，留空 = 仅本地模拟模式）</label>
+            <input value={ghToken} onChange={(e) => setGhToken(e.target.value)} placeholder="ghp_… / github_pat_…" className="mono" type="password" />
+          </div>
+          {ghResult && (
+            <div className="key-ok" style={ghResult.ok ? {} : { background: "var(--red-dim)", borderColor: "var(--red-line)", color: "var(--red)" }}>
+              <I name={ghResult.ok ? "i-check" : "i-alert"} size={14} />{ghResult.detail}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+            <button className="btn btn-ghost btn-sm" disabled={busy || !ghToken.trim()} onClick={saveGithubToken}>保存 PAT</button>
+          </div>
+          <div className="sec-note" style={{ marginTop: 14 }}>
             <I name="i-shield" size={15} style={{ color: "var(--acc)", marginTop: 2, flex: "none" }} />
-            <div>演示模式使用<b>本地 git 裸仓模拟 GitHub origin</b>：分支、堆叠、diff 均真实执行，PR 落库展示。真实 GitHub OAuth + Octokit 接入为 P1（引擎与仓库层已留适配接口）。</div>
+            <div>PAT 以 <b>AES-256-GCM 加密存储</b>；git 操作仅在 clone/fetch/push 窗口内经 http.extraheader 注入，<b>不写入 .git/config</b>。填了 PAT 即可在下一步接入真实 GitHub 仓库；真实 OAuth 登录流程为后续版本。</div>
           </div>
         </div></div>
 
@@ -110,9 +144,23 @@ export default function OnboardingPage() {
               <I name="i-folder" size={15} style={{ color: "var(--acc)" }} />创建项目
             </div>
             <div className="field">
-              <label>项目名</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="my-api" className="mono" />
+              <label>项目来源</label>
+              <div className="seg" style={{ marginTop: 4 }}>
+                <span className={originKind === "local" ? "on" : ""} onClick={() => setOriginKind("local")}>本地模拟仓库</span>
+                <span className={originKind === "github" ? "on" : ""} onClick={() => setOriginKind("github")}>真实 GitHub 仓库</span>
+              </div>
             </div>
+            {originKind === "local" ? (
+              <div className="field">
+                <label>项目名</label>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="my-api" className="mono" />
+              </div>
+            ) : (
+              <div className="field">
+                <label>仓库（owner/repo；需已保存有 repo scope 的 PAT）</label>
+                <input value={repoFullName} onChange={(e) => setRepoFullName(e.target.value)} placeholder="your-name/your-repo" className="mono" />
+              </div>
+            )}
             <div className="field">
               <label>失败策略（FR-C3：提交队列时可再覆盖）</label>
               <div className="seg" style={{ marginTop: 4 }}>

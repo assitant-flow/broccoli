@@ -24,10 +24,19 @@ import { env, STAGE_TYPES, type StageType } from "@/lib/env";
 import { getEngine } from "@/lib/engine";
 import type { StageContext, StageOutput } from "@/lib/engine/types";
 import { StageFailure } from "@/lib/engine/types";
-import { ensureProjectRepos, workPath, checkoutBranchFrom, pushBranch, diffStat, readRepoFile, checkoutExisting, mergeBranch } from "@/lib/git";
+import { ensureProjectRepos, workPath, checkoutBranchFrom, pushBranch, diffStat, readRepoFile, checkoutExisting, mergeBranch, type GitOriginOpts } from "@/lib/git";
+import { resolveGithubToken, createPullRequest, mergePullRequest, closePullRequest, closeIssue } from "@/lib/github";
 import { resolveStageModels, type StageModel } from "@/lib/models";
 import { notify } from "@/lib/notify";
 import { slugify } from "@/lib/engine/types";
+
+/** github origin 的 git 鉴权参数（token 解析：平台 env → 用户 PAT；design §12 窗口注入） */
+async function originOpts(project: typeof projects.$inferSelect): Promise<GitOriginOpts> {
+  if (project.originKind !== "github") return {};
+  const token = await resolveGithubToken(project.userId);
+  if (!token) throw new Error("github origin 需要 GITHUB_TOKEN（平台）或用户已存入 GitHub PAT");
+  return { remoteUrl: `https://github.com/${project.repoFullName}.git`, token };
+}
 
 /* ============ 运行时内存态（跨 tick / SSE） ============ */
 
@@ -182,8 +191,9 @@ export async function startQueuedRuns(): Promise<number> {
 
     // 环境准备：重置工作区到 base，创建堆叠分支（真实 git）
     try {
-      await ensureProjectRepos(project.id, {});
-      await checkoutBranchFrom(project.id, branch, baseBranch);
+      const origin = await originOpts(project);
+      await ensureProjectRepos(project.id, {}, origin);
+      await checkoutBranchFrom(project.id, branch, baseBranch, origin);
     } catch (err) {
       await failRun(claimed.id, null, `环境准备失败：${String(err)}`);
       continue;
@@ -603,18 +613,37 @@ async function completeRun(
   const [requirement] = await db.select().from(requirements).where(eq(requirements.id, run.requirementId)).limit(1);
   if (!project || !requirement) return;
 
-  // 真实 push 分支 + PR 记录（AC-F1 堆叠）
-  await pushBranch(project.id, run.branch!);
+  // 真实 push 分支 + PR（AC-F1 堆叠）：github origin 开真实 PR，本地模式镜像落库
+  const origin = await originOpts(project);
+  await pushBranch(project.id, run.branch!, origin);
   const stat = await diffStat(project.id, run.baseBranch!, run.branch!);
   const prBody = String(output.artifacts.find((a) => a.kind === "pr")?.meta?.body ?? "");
   const [{ count: prCount }] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(pullRequests)
     .where(eq(pullRequests.projectId, project.id));
+
+  let prNumber = prCount + 1;
+  if (project.originKind === "github") {
+    const token = origin.token!;
+    const real = await createPullRequest(token, project.repoFullName, {
+      head: run.branch!,
+      base: run.baseBranch!,
+      title: requirement.title,
+      body: `${prBody}\n\n> 由 Broccoli 流水线自动开出（需求 #${requirement.seq}）`,
+    });
+    if (!real.ok) {
+      await failRun(run.id, deliveryStage.id, `GitHub 开 PR 失败：${real.error}`);
+      return;
+    }
+    prNumber = real.pr!.number;
+    await logLine(run.id, deliveryStage.id, "ok", `🔗 真实 PR #${prNumber} 已开出：${real.pr!.htmlUrl}`);
+  }
+
   await db.insert(pullRequests).values({
     projectId: project.id,
     runId: run.id,
-    number: prCount + 1,
+    number: prNumber,
     title: requirement.title,
     branch: run.branch!,
     baseBranch: run.baseBranch!,
@@ -628,12 +657,17 @@ async function completeRun(
     await db.insert(memoryProposals).values({ projectId: project.id, sourceRunId: run.id, type: p.type, content: p.content });
   }
 
-  // Issues 状态回写（FR-C4）：需求关联的 open issue 随 PR 开出自动关闭
+  // Issues 状态回写（FR-C4）：需求关联的 open issue 随 PR 开出自动关闭（github 同步真实 API）
   const syncedIssues = await db
     .select()
     .from(issues)
     .where(and(eq(issues.syncedRequirementId, requirement.id), eq(issues.state, "open")));
   for (const is of syncedIssues) {
+    if (project.originKind === "github") {
+      const token = origin.token!;
+      const closed = await closeIssue(token, project.repoFullName, is.number);
+      if (!closed.ok) await logLine(run.id, deliveryStage.id, "warn", `Issue #${is.number} 关闭失败：${closed.error}`);
+    }
     await db.update(issues).set({ state: "closed", closedAt: new Date() }).where(eq(issues.id, is.id));
     await logLine(run.id, deliveryStage.id, "ok", `🔗 Issue #${is.number} 已关闭（状态回写，FR-C4）`);
   }
@@ -736,6 +770,18 @@ export async function mergeProjectPr(prId: string, userId: string): Promise<{ ok
     .where(and(eq(taskRuns.projectId, project.id), inArray(taskRuns.state, ["preparing", "running", "wait_confirm"])));
   if (active > 0) return { ok: false, message: "队列执行中，请等待当前任务进入终态后再合并" };
 
+  if (project.originKind === "github") {
+    // 真实合并：GitHub merge API（冲突/权限由 API 返回）
+    const token = await resolveGithubToken(userId);
+    if (!token) return { ok: false, message: "缺少 GitHub token（平台 GITHUB_TOKEN 或用户 PAT）" };
+    const res = await mergePullRequest(token, project.repoFullName, pr.number);
+    if (!res.ok) return { ok: false, message: `GitHub 合并失败：${res.error}` };
+    await db.update(pullRequests).set({ status: "merged" }).where(eq(pullRequests.id, prId));
+    await db.insert(auditLogs).values({ actor: "user", action: "merge_pr", target: `pr:${prId}`, detail: { number: pr.number, real: true } });
+    await logLineByPr(project.id, pr, `✓ 真实 PR #${pr.number} 已通过 GitHub API 合并到 ${pr.baseBranch}（FR-F2）`);
+    return { ok: true, message: `真实 PR #${pr.number} 已合并到 ${pr.baseBranch}` };
+  }
+
   await checkoutExisting(project.id, pr.baseBranch);
   await mergeBranch(project.id, pr.branch, `Merge PR #${pr.number}: ${pr.title}`);
   await pushBranch(project.id, pr.baseBranch);
@@ -762,7 +808,12 @@ export async function rebasePrChain(prId: string, userId: string): Promise<{ ok:
     .from(pullRequests)
     .where(and(eq(pullRequests.projectId, project.id), sql`${pullRequests.number} >= ${pr.number}`, eq(pullRequests.status, "open")));
   const requeued: string[] = [];
+  const ghToken = project.originKind === "github" ? await resolveGithubToken(userId) : null;
   for (const p of laterPrs) {
+    if (ghToken) {
+      const closed = await closePullRequest(ghToken, project.repoFullName, p.number);
+      if (!closed.ok) return { ok: false, message: `GitHub 关闭 PR #${p.number} 失败：${closed.error}`, requeued: 0 };
+    }
     await db.update(pullRequests).set({ status: "closed" }).where(eq(pullRequests.id, p.id));
     if (p.runId) {
       const [run] = await db.select().from(taskRuns).where(eq(taskRuns.id, p.runId)).limit(1);

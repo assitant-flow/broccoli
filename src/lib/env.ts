@@ -12,6 +12,8 @@ export const env = {
   anthropicModel: process.env.ANTHROPIC_MODEL ?? "",
   /** 平台级 Anthropic Token（ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY），优先于用户 BYO key */
   anthropicAuthToken: process.env.ANTHROPIC_AUTH_TOKEN ?? process.env.ANTHROPIC_API_KEY ?? "",
+  /** 平台级 GitHub Token（repo scope）；originKind=github 项目使用 */
+  githubToken: process.env.GITHUB_TOKEN ?? "",
   /** 验收回路最大自动修复轮数（FR-D14，默认 1） */
   maxRepairRounds: Number(process.env.BROCCOLI_MAX_REPAIR_ROUNDS ?? 1),
   siteUrl: process.env.BROCCOLI_SITE_URL ?? "http://localhost:3000",

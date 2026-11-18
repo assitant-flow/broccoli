@@ -52,7 +52,7 @@ pnpm smoke
 | 调度器独立进程 | `src/instrumentation.ts` 内启动（单例 + globalThis 守卫） | 拆独立进程 |
 | 沙箱容器（Docker） | 本地工作区（`.data/repos/<id>/work`）+ 真实进程 | 实现 `ContainerProvider` 第二实现 |
 | Anthropic 兼容 LLM（Claude/GLM 等） | `ExecutionEngine` 抽象：`MockEngine`（离线演示）+ `ClaudeEngine`（Messages 兼容协议，`ANTHROPIC_BASE_URL`/`ANTHROPIC_MODEL`/`ANTHROPIC_AUTH_TOKEN` 可指向官方或本地 router）。**已用 GLM（glm:glm-5.3）经本地 router 完成端到端验收（smoke 50/50 全绿）**；规划/验收由真实模型产出（JSON 容错重试 + 输出不合规自动降级模板），验收判定为机械护栏（校验类标准对照源码核验，触发 FR-D14 回溯） | 容器内换 Claude Code Agent SDK（permission 回调、session resume） |
-| GitHub OAuth + Octokit | 本地裸仓模拟（PR 落库、diff 真实） | `originKind=github` 接 Octokit |
+| GitHub（真实集成） | `originKind=github`：真实 clone/push（extraheader 注入 token，HTTP/1.1 防挂起）+ REST 开 PR/合并/关闭/Issues 同步。**已用真实仓库 AlpherJang/broccoli-demo 完成 13/13 端到端验证（pnpm verify:github）**；OAuth 登录流程待用户注册 OAuth App，当前为 PAT 模式 | OAuth App 登录流程 |
 | 邮件（Resend/SMTP） | OutboxMailer 落盘 `.data/outbox/*.eml` | 换 Resend 适配器 |
 | GitHub Issues | 本地模拟 Issues 落库，拉入队列 + PR 开出自动关闭回写 | Octokit issues API |
 | OAuth | 本地账号体系（scrypt + HMAC 会话） | GitHub OAuth 接入 |

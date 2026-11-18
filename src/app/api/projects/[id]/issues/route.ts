@@ -4,19 +4,41 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { getSessionUser, unauthorized } from "@/lib/auth";
 import { ok, bad } from "@/lib/api";
 import { createRunForRequirement } from "@/lib/pipeline/orchestrator";
+import { resolveGithubToken, listOpenIssues } from "@/lib/github";
 
 async function ownedProject(userId: string, id: string) {
   const [p] = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.userId, userId))).limit(1);
   return p ?? null;
 }
 
-/** Issues 列表（本地模拟 GitHub，FR-C4） */
+/** Issues 列表（github origin 自动拉取真实 open issues 并镜像；FR-C4） */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
   if (!user) return unauthorized();
   const { id } = await params;
   const project = await ownedProject(user.id, id);
   if (!project) return bad("项目不存在", 404, "NOT_FOUND");
+
+  if (project.originKind === "github") {
+    const token = await resolveGithubToken(user.id);
+    if (token) {
+      const real = await listOpenIssues(token, project.repoFullName);
+      if (real.ok && real.issues) {
+        for (const i of real.issues) {
+          const [existing] = await db
+            .select()
+            .from(issues)
+            .where(and(eq(issues.projectId, id), eq(issues.number, i.number)))
+            .limit(1);
+          if (!existing) {
+            await db.insert(issues).values({ projectId: id, number: i.number, title: i.title, body: i.body });
+          } else if (existing.state === "open") {
+            await db.update(issues).set({ title: i.title, body: i.body }).where(eq(issues.id, existing.id));
+          }
+        }
+      }
+    }
+  }
   const rows = await db.select().from(issues).where(eq(issues.projectId, id)).orderBy(asc(issues.number));
   return ok(rows);
 }

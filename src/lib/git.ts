@@ -25,30 +25,61 @@ async function git(cwd: string, ...args: string[]): Promise<string> {
   return stdout.trim();
 }
 
-/** 初始化裸 origin + 工作区，并写入种子文件、提交到 main */
-export async function ensureProjectRepos(projectId: string, seedFiles: Record<string, string>): Promise<void> {
+/** github origin 的鉴权参数：token 经 http.extraheader 注入，命令级生效、不写入 .git/config（design §12）；
+ *  强制 HTTP/1.1（规避 GitHub HTTPS 偶发 HTTP2 framing 层错误） */
+function authArgs(token?: string): string[] {
+  const base = ["-c", "http.version=HTTP/1.1", "-c", "http.postBuffer=524288000"];
+  if (!token) return base;
+  const b64 = Buffer.from(`x-access-token:${token}`).toString("base64");
+  return [...base, "-c", `http.extraheader=AUTHORIZATION: basic ${b64}`];
+}
+
+/** 网络型 git 命令：禁用交互提示（防挂起）+ 超时 + 失败重试一次 */
+async function gitNet(cwd: string, token: string | undefined, args: string[], timeoutMs = 180000): Promise<void> {
+  const attempt = () =>
+    run("git", [...authArgs(token), ...args], {
+      cwd,
+      maxBuffer: 1024 * 1024 * 16,
+      timeout: timeoutMs,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "echo" },
+    });
+  try {
+    await attempt();
+  } catch (err) {
+    // 网络类瞬时失败（HTTP2 framing / 连接重置等）重试一次
+    await new Promise((r) => setTimeout(r, 2000));
+    await attempt();
+  }
+}
+
+export interface GitOriginOpts {
+  /** github origin 的远程地址；缺省 = 本地裸仓 origin */
+  remoteUrl?: string;
+  /** github origin 的访问 token（clone/fetch/push 窗口内使用） */
+  token?: string;
+}
+
+/** 初始化 origin + 工作区：本地模式 init 裸仓并写种子文件；github 模式 clone 真实远程仓库 */
+export async function ensureProjectRepos(projectId: string, seedFiles: Record<string, string>, opts?: GitOriginOpts): Promise<void> {
   const dir = projectRepoDir(projectId);
-  const origin = originPath(projectId);
   const work = workPath(projectId);
   await fs.mkdir(path.join(dir), { recursive: true });
-
-  const originExists = await fs
-    .access(path.join(origin, "HEAD"))
-    .then(() => true)
-    .catch(() => false);
-  if (!originExists) {
-    await git(dir, "init", "--bare", "--initial-branch=main", origin);
-  }
 
   const workExists = await fs
     .access(path.join(work, ".git"))
     .then(() => true)
     .catch(() => false);
-  if (!workExists) {
+  if (workExists) return;
+
+  if (opts?.remoteUrl) {
+    // 真实 GitHub 仓库：clone 远程（token 仅经 extraheader 传入；HTTP/1.1 + 防挂起 + 重试）
+    await fs.mkdir(work, { recursive: true });
+    await gitNet(work, opts.token, ["clone", opts.remoteUrl, "."], 180000);
+  } else {
+    const origin = originPath(projectId);
+    await git(dir, "init", "--bare", "--initial-branch=main", origin);
     await fs.mkdir(work, { recursive: true });
     await git(work, "clone", origin, ".");
-    await git(work, "config", "user.email", "agent@broccoli.dev");
-    await git(work, "config", "user.name", "Broccoli Agent");
     for (const [rel, content] of Object.entries(seedFiles)) {
       const p = path.join(work, rel);
       await fs.mkdir(path.dirname(p), { recursive: true });
@@ -58,6 +89,8 @@ export async function ensureProjectRepos(projectId: string, seedFiles: Record<st
     await git(work, "commit", "-m", "chore: 初始化项目骨架");
     await git(work, "push", "origin", "main");
   }
+  await git(work, "config", "user.email", "agent@broccoli.dev");
+  await git(work, "config", "user.name", "Broccoli Agent");
 }
 
 export async function currentBranch(projectId: string): Promise<string> {
@@ -65,9 +98,9 @@ export async function currentBranch(projectId: string): Promise<string> {
 }
 
 /** 检出（-B：从 from 重建本地分支 —— 重试/堆叠链修复要求每次尝试都从 base 重新开始） */
-export async function checkoutBranchFrom(projectId: string, branch: string, from: string): Promise<void> {
+export async function checkoutBranchFrom(projectId: string, branch: string, from: string, opts?: GitOriginOpts): Promise<void> {
   const work = workPath(projectId);
-  await git(work, "fetch", "origin");
+  await gitNet(work, opts?.token, ["fetch", "origin"], 120000);
   await git(work, "checkout", "-B", branch, from);
 }
 
@@ -80,8 +113,8 @@ export async function commitAll(projectId: string, message: string): Promise<boo
   return true;
 }
 
-export async function pushBranch(projectId: string, branch: string): Promise<void> {
-  await git(workPath(projectId), "push", "--force-with-lease", "-u", "origin", branch);
+export async function pushBranch(projectId: string, branch: string, opts?: GitOriginOpts): Promise<void> {
+  await gitNet(workPath(projectId), opts?.token, ["push", "--force-with-lease", "-u", "origin", branch], 120000);
 }
 
 export async function diffStat(projectId: string, base: string, head: string): Promise<string> {
