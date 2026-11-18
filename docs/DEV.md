@@ -1,6 +1,6 @@
 # Broccoli 开发与运行指南
 
-> 本仓库已实现 [requirements](requirements.md) / [design](design.md) 定义的 **MVP 全部 P0 功能**，并附带离线演示模式（无需 Anthropic key / GitHub 授权即可端到端跑通）。本文档说明如何运行、演示脚本覆盖哪些验收路径、以及与设计文档的偏差清单。**当前状态：MVP P0 + P1 全部实现，`pnpm smoke` 37 项断言全绿。**
+> 本仓库已实现 [requirements](requirements.md) / [design](design.md) 定义的 **MVP 全部 P0 功能**，并附带离线演示模式（无需 Anthropic key / GitHub 授权即可端到端跑通）。本文档说明如何运行、演示脚本覆盖哪些验收路径、以及与设计文档的偏差清单。**当前状态：`pnpm smoke` 50 项断言全绿（真实 LLM 引擎）；`pnpm verify:github` 13 项全绿（真实 GitHub 集成）；`pnpm verify:suspend` 11 项全绿（挂起路径）。**
 
 ## 快速开始
 
@@ -54,7 +54,7 @@ pnpm smoke
 | Anthropic 兼容 LLM（Claude/GLM 等） | `ExecutionEngine` 抽象：`MockEngine`（离线演示）+ `ClaudeEngine`（Messages 兼容协议，`ANTHROPIC_BASE_URL`/`ANTHROPIC_MODEL`/`ANTHROPIC_AUTH_TOKEN` 可指向官方或本地 router）。**已用 GLM（glm:glm-5.3）经本地 router 完成端到端验收（smoke 50/50 全绿）**；规划/验收由真实模型产出（JSON 容错重试 + 输出不合规自动降级模板），验收判定为机械护栏（校验类标准对照源码核验，触发 FR-D14 回溯） | 容器内换 Claude Code Agent SDK（permission 回调、session resume） |
 | GitHub（真实集成） | `originKind=github`：真实 clone/push（extraheader 注入 token，HTTP/1.1 防挂起）+ REST 开 PR/合并/关闭/Issues 同步。**已用真实仓库 AlpherJang/broccoli-demo 完成 13/13 端到端验证（pnpm verify:github）**；OAuth 登录流程待用户注册 OAuth App，当前为 PAT 模式 | OAuth App 登录流程 |
 | 邮件（Resend/SMTP） | OutboxMailer 落盘 `.data/outbox/*.eml` | 换 Resend 适配器 |
-| GitHub Issues | 本地模拟 Issues 落库，拉入队列 + PR 开出自动关闭回写 | Octokit issues API |
+| GitHub Issues | 真实 REST 同步（github origin：拉取 open issues 镜像、PR 开出后真实关闭回写）；本地模式为模拟落库 | — |
 | OAuth | 本地账号体系（scrypt + HMAC 会话） | GitHub OAuth 接入 |
 
 ## 关键实现位置
