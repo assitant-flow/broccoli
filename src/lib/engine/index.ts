@@ -7,9 +7,15 @@ import { MockEngine } from "./mock";
 import { ClaudeEngine } from "./claude";
 import type { ExecutionEngine } from "./types";
 
-/** 引擎选择（ExecutionTarget 抽象的进程内实现）：claude 需要用户 BYO key，否则回落 mock */
+/**
+ * 引擎选择（ExecutionTarget 抽象的进程内实现）：
+ * BROCCOLI_ENGINE=claude 时优先用平台级 token（ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY），
+ * 其次用户 BYO key（任意非空 token，兼容官方 sk-ant-* 与 router token）；
+ * 都没有则回落 MockEngine（离线演示）。
+ */
 export async function getEngine(userId: string): Promise<ExecutionEngine> {
   if (env.engine === "claude") {
+    if (env.anthropicAuthToken) return new ClaudeEngine(env.anthropicAuthToken);
     const [cred] = await db
       .select()
       .from(credentials)
@@ -18,7 +24,7 @@ export async function getEngine(userId: string): Promise<ExecutionEngine> {
     if (cred) {
       try {
         const key = decryptSecret(cred.ciphertext);
-        if (key.startsWith("sk-ant-")) return new ClaudeEngine(key);
+        if (key.trim()) return new ClaudeEngine(key);
       } catch {
         /* 解密失败回落 mock */
       }

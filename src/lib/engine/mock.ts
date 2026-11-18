@@ -155,7 +155,7 @@ export class MockEngine implements ExecutionEngine {
       ctx.repairRound > 0 ? `// 回溯修复第 ${ctx.repairRound} 轮：补充校验逻辑` : "",
       `export function solve(input) {`,
       `  if (input == null || typeof input !== "object") throw new Error("input must be object");`,
-      ctx.repairRound > 0 ? `  if ("page" in input && typeof input.page !== "number") throw new Error("page must be number");` : "",
+      ctx.repairRound > 0 ? `  if ("page" in input && (!Number.isInteger(input.page) || input.page < 1)) throw new Error("page must be a positive integer");` : "",
       `  return { ok: true, module: "${moduleName}", at: Date.now() };`,
       `}`,
       `export default solve;`,
@@ -203,7 +203,7 @@ export class MockEngine implements ExecutionEngine {
       `});`,
       "",
       failMode ? `test("${ctx.requirement.title} · 深色模式偏好持久化（预期失败示范）", () => {` : `test("${ctx.requirement.title} · 参数校验", () => {`,
-      failMode ? `  const r = solve({ theme: "dark" });\n  assert.equal(r.ok, false); // 故意失败：模拟 agent 产出缺陷 [fail-tests]` : ctx.repairRound > 0 && wantsRepair(ctx.requirement.title) ? `  assert.throws(() => solve({ page: "NaN" })); // 修复后：校验生效（FR-D14 回路闭合）` : `  assert.throws(() => solve(42));`,
+      failMode ? `  const r = solve({ theme: "dark" });\n  assert.equal(r.ok, false); // 故意失败：模拟 agent 产出缺陷 [fail-tests]` : ctx.repairRound > 0 && wantsRepair(ctx.requirement.title) ? `  assert.throws(() => solve({ page: "NaN" }));\n  assert.throws(() => solve({ page: 0 })); // 修复后：类型与边界校验都生效（FR-D14 回路闭合）` : `  assert.throws(() => solve(42));`,
       `});`,
       "",
     ].join("\n");

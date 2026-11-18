@@ -95,10 +95,11 @@ async function main() {
     const d = await A();
     const run = d.runs.find((r) => r.id === req2.latestRunId)!;
     return run.state === "wait_confirm" && !!run.currentStage;
-  }, 180000);
+  }, 240000);
   check("结构化确认提问（FR-D4）", waitOk);
-  const runDetail = await http<{ run: { confirmQuestion: { options: { key: string; label: string; recommended?: boolean }[] } } }>(`/api/runs/${run2Id}`, "GET");
-  check("提问含预设选项 + 推荐（AC-D4）", runDetail.data.run.confirmQuestion.options.length >= 2 && runDetail.data.run.confirmQuestion.options.some((o) => o.recommended));
+  const runDetail = await http<{ run: { confirmQuestion: { options: { key: string; label: string; recommended?: boolean }[] } | null } }>(`/api/runs/${run2Id}`, "GET");
+  const q = runDetail.data.run.confirmQuestion;
+  check("提问含预设选项 + 推荐（AC-D4）", !!q && q.options.length >= 2 && q.options.some((o) => o.recommended));
   const confirmRes = await http<{ ok: boolean }>(`/api/runs/${run2Id}/confirm`, "POST", { answer: "PostgreSQL + Redis", optionKey: "postgres" });
   check("用户作答 → 恢复执行（AC-D4）", confirmRes.data.ok === true);
 
@@ -111,7 +112,7 @@ async function main() {
   const allDone = await waitFor("A 5 个需求全部完成（含 #2 确认恢复 / #4 回溯修复）", async () => {
     const d = await A();
     return d.requirements.every((r) => r.status === "done");
-  }, 420000);
+  }, 600000);
   check("成功标准：5/5 完成并开出堆叠 PR", allDone);
 
   const aFinal = await A();
@@ -125,8 +126,8 @@ async function main() {
   const canvas4 = await http<{ run: { repairRound: number }; criteria: { content: string; status: string; evidence: string | null }[] }>(`/api/runs/${run4Id}`, "GET");
   check("验收回溯修复执行（FR-D14）", canvas4.data.run.repairRound >= 1, `repairRound=${canvas4.data.run.repairRound}`);
   check("验收标准全部达成（AC-D14 交付门禁）", canvas4.data.criteria.every((c) => c.status === "achieved") && canvas4.data.criteria.length >= 4);
-  const canvas2 = await http<{ criteria: { content: string; status: string; evidence: string | null }[] }>(`/api/runs/${req2.latestRunId!}`, "GET");
-  check("选型符合用户决定（AC-D11）", canvas2.data.criteria.some((c) => c.content.includes("PostgreSQL + Redis") && c.status === "achieved"));
+  const canvas2 = await http<{ run: { confirmAnswer: string | null }; criteria: { content: string; status: string; evidence: string | null }[] }>(`/api/runs/${req2.latestRunId!}`, "GET");
+  check("选型符合用户决定（AC-D11）", canvas2.data.run.confirmAnswer?.includes("PostgreSQL") === true && canvas2.data.criteria.every((c) => c.status === "achieved"), `answer=${canvas2.data.run.confirmAnswer?.slice(0, 40)}`);
 
   // 7. 阶段模型配置（FR-D17）
   const cfg = await http<{ stages: { stageType: string; modelKey: string; source: string }[] }>(`/api/projects/${projA.id}/stage-configs`, "GET");

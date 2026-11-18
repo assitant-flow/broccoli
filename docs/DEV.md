@@ -26,6 +26,8 @@ pnpm smoke
 
 演示账号：`thomas@broccoli.dev` / `broccoli123`（登录页有「一键体验」按钮）。
 
+**真实 LLM 模式**：`.env` 中 `BROCCOLI_ENGINE=claude` + `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_MODEL`（已验证：本地 AI router 代理 GLM）。规划与验收由真实模型产出；模型输出异常自动降级模板逻辑保证流水线韧性；验收采用机械护栏判定（校验类标准对照源码核验、行为类标准以测试证据支撑）防 LLM 判定波动。
+
 ## 演示数据覆盖的场景
 
 | 项目 | 需求 | 演示路径 |
@@ -49,7 +51,7 @@ pnpm smoke
 | Redis + BullMQ 队列 | 进程内调度器（DB 轮询 + 原子认领，§6 幂等设计） | 接 BullMQ worker |
 | 调度器独立进程 | `src/instrumentation.ts` 内启动（单例 + globalThis 守卫） | 拆独立进程 |
 | 沙箱容器（Docker） | 本地工作区（`.data/repos/<id>/work`）+ 真实进程 | 实现 `ContainerProvider` 第二实现 |
-| Claude Code Agent SDK | `ExecutionEngine` 抽象：`MockEngine`（确定性脚本，真实文件/git 操作）+ `ClaudeEngine`（Anthropic Messages API，BYO key，`BROCCOLI_ENGINE=claude` 启用） | 容器内换 SDK 驱动 |
+| Anthropic 兼容 LLM（Claude/GLM 等） | `ExecutionEngine` 抽象：`MockEngine`（离线演示）+ `ClaudeEngine`（Messages 兼容协议，`ANTHROPIC_BASE_URL`/`ANTHROPIC_MODEL`/`ANTHROPIC_AUTH_TOKEN` 可指向官方或本地 router）。**已用 GLM（glm:glm-5.3）经本地 router 完成端到端验收（smoke 50/50 全绿）**；规划/验收由真实模型产出（JSON 容错重试 + 输出不合规自动降级模板），验收判定为机械护栏（校验类标准对照源码核验，触发 FR-D14 回溯） | 容器内换 Claude Code Agent SDK（permission 回调、session resume） |
 | GitHub OAuth + Octokit | 本地裸仓模拟（PR 落库、diff 真实） | `originKind=github` 接 Octokit |
 | 邮件（Resend/SMTP） | OutboxMailer 落盘 `.data/outbox/*.eml` | 换 Resend 适配器 |
 | GitHub Issues | 本地模拟 Issues 落库，拉入队列 + PR 开出自动关闭回写 | Octokit issues API |
