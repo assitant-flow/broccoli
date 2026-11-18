@@ -12,6 +12,6 @@ export async function GET() {
     .from(notificationEvents)
     .where(and(eq(notificationEvents.userId, user.id), eq(notificationEvents.status, "sent")))
     .orderBy(desc(notificationEvents.createdAt))
-    .limit(20);
+    .limit(50);
   return ok(rows);
 }

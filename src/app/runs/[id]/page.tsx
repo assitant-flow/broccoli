@@ -36,12 +36,14 @@ type Canvas = {
   prs: { id: string; number: number; branch: string; baseBranch: string; body: string; diffStat: string }[];
 };
 
-const LAYOUT: Record<string, { x: number; y: number; w: number; h?: number }> = {
+const DEFAULT_LAYOUT: Record<string, { x: number; y: number; w: number }> = {
+  entry: { x: 18, y: 292, w: 140 },
   planning: { x: 196, y: 186, w: 246 },
   dev: { x: 496, y: 66, w: 252 },
   test_design: { x: 496, y: 392, w: 252 },
   test_run: { x: 812, y: 190, w: 250 },
   acceptance: { x: 812, y: 382, w: 250 },
+  delivery: { x: 812, y: 576, w: 250 },
 };
 const STAGE_ORDER = ["planning", "dev", "test_design", "test_run", "acceptance", "delivery"];
 const STAGE_NAMES: Record<string, string> = {
@@ -172,26 +174,83 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   }
 
   const run = data?.run;
+
+  /* ============ 画布布局：可拖拽 + localStorage 持久化 ============ */
+  const [pos, setPos] = useState<Record<string, { x: number; y: number; w?: number }>>(DEFAULT_LAYOUT);
+  const dragRef = useRef<{ key: string; sx: number; sy: number; ox: number; oy: number } | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(`broccoli-canvas-${id}`) ?? "null") as Record<string, { x: number; y: number }> | null;
+      if (saved) setPos((p) => ({ ...p, ...saved }));
+    } catch { /* 忽略损坏的布局数据 */ }
+  }, [id]);
+
+  function persistPos(next: Record<string, { x: number; y: number }>) {
+    if (!id) return;
+    try { localStorage.setItem(`broccoli-canvas-${id}`, JSON.stringify(next)); } catch { /* 存储满则忽略 */ }
+  }
+
+  function onNodePointerDown(e: React.PointerEvent, key: string) {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { key, sx: e.clientX, sy: e.clientY, ox: pos[key].x, oy: pos[key].y };
+  }
+  function onNodePointerMove(e: React.PointerEvent) {
+    const d = dragRef.current;
+    if (!d || d.key !== (e.currentTarget as HTMLElement).dataset.nodeKey) return;
+    const w = DEFAULT_LAYOUT[d.key]?.w ?? 250;
+    const x = Math.max(0, Math.min(1110 - w, d.ox + e.clientX - d.sx));
+    const y = Math.max(0, Math.min(560, d.oy + e.clientY - d.sy));
+    setPos((p) => ({ ...p, [d.key]: { x, y } }));
+  }
+  function onNodePointerUp(e: React.PointerEvent) {
+    const d = dragRef.current;
+    if (!d) return;
+    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    dragRef.current = null;
+    setPos((p) => { persistPos(p); return p; });
+  }
+  function resetLayout() {
+    setPos(DEFAULT_LAYOUT);
+    persistPos(DEFAULT_LAYOUT);
+  }
+
+  const dragProps = (key: string) => ({
+    "data-node-key": key,
+    onPointerDown: (e: React.PointerEvent) => onNodePointerDown(e, key),
+    onPointerMove: onNodePointerMove,
+    onPointerUp: onNodePointerUp,
+    onPointerCancel: onNodePointerUp,
+  });
+
   const edges = useMemo(() => {
-    const st = (t: string) => stagesByType.get(t);
     const cls = (t: string) => {
-      const s = st(t);
+      const s = stagesByType.get(t);
       if (!s) return "edge";
-      if (s.state === "completed") return "edge done";
+      if (s.state === "completed" || s.state === "wait_confirm" || s.state === "skipped") return "edge done";
       if (s.state === "running") return "edge active";
-      if (s.state === "wait_confirm") return "edge done";
       return "edge";
     };
+    // 锚点：节点右/左边缘中点（随拖拽位置动态计算，连线自动跟随）
+    const R = (k: string) => ({ x: pos[k].x + (DEFAULT_LAYOUT[k]?.w ?? 250), y: pos[k].y + 30 });
+    const L = (k: string) => ({ x: pos[k].x, y: pos[k].y + 30 });
+    const B = (k: string) => ({ x: pos[k].x + (DEFAULT_LAYOUT[k]?.w ?? 250) / 2, y: pos[k].y + 50 });
+    const T = (k: string) => ({ x: pos[k].x + (DEFAULT_LAYOUT[k]?.w ?? 250) / 2, y: pos[k].y });
+    const curve = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      `M${a.x} ${a.y} C ${a.x + 42} ${a.y} ${b.x - 42} ${b.y} ${b.x} ${b.y}`;
+    const line = (a: { x: number; y: number }, b: { x: number; y: number }) => `M${a.x} ${a.y} L ${b.x} ${b.y}`;
     return [
-      { d: "M158 318 C 180 318 176 302 196 302", cls: "edge done" },
-      { d: "M442 276 C 470 276 468 160 496 160", cls: cls("dev") },
-      { d: "M442 330 C 470 330 468 480 496 480", cls: cls("test_design") },
-      { d: "M748 160 C 782 160 780 245 812 245", cls: cls("test_run") },
-      { d: "M748 480 C 782 480 780 285 812 285", cls: cls("test_run") },
-      { d: "M937 340 L 937 382", cls: cls("acceptance") },
-      { d: "M937 532 L 937 576", cls: cls("delivery") },
+      { d: curve(R("entry"), L("planning")), c: "edge done" },
+      { d: curve(R("planning"), L("dev")), c: cls("dev") },
+      { d: curve(R("planning"), L("test_design")), c: cls("test_design") },
+      { d: curve(R("dev"), L("test_run")), c: cls("test_run") },
+      { d: curve(R("test_design"), L("test_run")), c: cls("test_run") },
+      { d: line(B("test_run"), T("acceptance")), c: cls("acceptance") },
+      { d: line(B("acceptance"), T("delivery")), c: cls("delivery") },
     ];
-  }, [stagesByType]);
+  }, [stagesByType, pos]);
 
   const runChip = () => {
     if (!run) return null;
@@ -345,26 +404,27 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
               <span><i className="lq" />排队中</span>
             </span>
             <span className="sp" />
+            <button className="btn btn-ghost btn-sm" onClick={resetLayout} title="恢复默认画布布局">重置布局</button>
             <Link className="btn btn-ghost btn-sm" href={`/projects/${data?.project?.id}`}><I name="i-sliders" size={13} />阶段与模型配置</Link>
           </div>
           <div className="shell"><div className="canvas-wrap">
             <svg className="edges" width="1110" height="620" viewBox="0 0 1110 620">
-              {edges.map((e, i) => <path key={i} className={e.cls} d={e.d} />)}
+              {edges.map((e, i) => <path key={i} className={e.c} d={e.d} />)}
             </svg>
-            <div className="stage-pill" style={{ left: 18, top: 292, width: 140 }}>
+            <div className="stage-pill" style={{ left: pos.entry.x, top: pos.entry.y, width: pos.entry.w, cursor: "grab", touchAction: "none", userSelect: "none" }} {...dragProps("entry")}>
               <I name="i-leaf" size={15} />
               <div><div>需求 #{data?.requirement?.seq}</div><div className="sub">已受理 · {fmtTime(run?.startedAt)}</div></div>
             </div>
             {["planning", "dev", "test_design", "test_run", "acceptance"].map((t) => {
               const s = stagesByType.get(t);
-              const layout = LAYOUT[t];
+              const layout = pos[t];
               if (!s) return null;
               const chip = stageChip(s.state);
               const artList = data?.artifacts.filter((a) => a.stageId === s.id) ?? [];
               const criteriaHere = data?.criteria.filter((c) => c.verifyStage === t) ?? [];
               const failedHere = criteriaHere.filter((c) => c.status === "failed").length;
               return (
-                <div key={t} className={`cnode ${nodeCls(s.state)} ${selected === t ? "sel" : ""}`} style={{ left: layout.x, top: layout.y, width: layout.w }} onClick={() => setSelected(t)}>
+                <div key={t} className={`cnode ${nodeCls(s.state)} ${selected === t ? "sel" : ""}`} style={{ left: layout.x, top: layout.y, width: layout.w, cursor: "grab", touchAction: "none", userSelect: "none" }} {...dragProps(t)} onClick={() => setSelected(t)}>
                   <div className="cn-hd">
                     <span className="cn-ic"><I name={STAGE_ICONS[t]} size={14} /></span>
                     <span className="cn-name">{STAGE_NAMES[t]}</span>
@@ -393,7 +453,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                 </div>
               );
             })}
-            <div className="stage-pill" style={{ left: 812, top: 576, width: 250 }}>
+            <div className="stage-pill" style={{ left: pos.delivery.x, top: pos.delivery.y, width: pos.delivery.w, cursor: "grab", touchAction: "none", userSelect: "none" }} {...dragProps("delivery")}>
               <I name="i-pr" size={15} />
               <div>
                 <div>交付 · {data?.prs.length ? `PR #${data.prs[0].number} 已开出` : "PR（待验收达成）"}</div>

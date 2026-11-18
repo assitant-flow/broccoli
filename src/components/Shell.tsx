@@ -7,20 +7,11 @@ import { api } from "@/lib/client";
 import { IconDefs, I } from "./Icons";
 
 type Me = { id: string; email: string; displayName: string };
-type Notif = { id: string; type: string; runId: string | null; createdAt: string; dedupeKey: string };
 
-const NOTIF_META: Record<string, { cls: string; label: string }> = {
-  wait_confirm: { cls: "chip-amber", label: "等待确认" },
-  failed: { cls: "chip-red", label: "失败" },
-  suspended: { cls: "chip-amber", label: "已挂起" },
-  completed: { cls: "chip-green", label: "完成" },
-};
-
-export function Shell({ active, children }: { active: "dashboard" | "projects" | "memories" | "usage"; children: React.ReactNode }) {
+export function Shell({ active, children }: { active: "dashboard" | "projects" | "memories" | "usage" | "notifications"; children: React.ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [projectCount, setProjectCount] = useState<number>(0);
-  const [notifs, setNotifs] = useState<Notif[]>([]);
-  const [bellOpen, setBellOpen] = useState(false);
+  const [notifCount, setNotifCount] = useState<number>(0);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -30,7 +21,7 @@ export function Shell({ active, children }: { active: "dashboard" | "projects" |
   }, [pathname]);
 
   useEffect(() => {
-    const load = () => api<Notif[]>("/api/notifications").then(setNotifs).catch(() => {});
+    const load = () => api<unknown[]>("/api/notifications").then((n) => setNotifCount(n.length)).catch(() => {});
     load();
     const t = setInterval(load, 5000);
     return () => clearInterval(t);
@@ -59,30 +50,14 @@ export function Shell({ active, children }: { active: "dashboard" | "projects" |
           <Link className={`nav-item ${active === "projects" ? "on" : ""}`} href="/projects"><I name="i-folder" size={17} />项目<span className="cnt">{projectCount}</span></Link>
           <span className="nav-item" style={{ opacity: 0.5, cursor: "default" }}><I name="i-spark" size={17} />记忆库<span className="cnt">按项目</span></span>
           <Link className={`nav-item ${active === "usage" ? "on" : ""}`} href="/usage"><I name="i-gauge" size={17} />用量与成本</Link>
-
-          <div style={{ position: "relative", marginTop: 8 }}>
-            <button className={`nav-item ${bellOpen ? "on" : ""}`} style={{ width: "100%" }} onClick={() => setBellOpen((v) => !v)}>
-              <I name="i-mail" size={17} />站内通知
-              {notifs.length > 0 && <span className="cnt" style={{ background: "var(--amber-dim)", color: "var(--amber)", borderRadius: 999, padding: "1px 7px", fontSize: 10 }}>{notifs.length}</span>}
-            </button>
-            {bellOpen && (
-              <div className="shell" style={{ position: "absolute", right: 0, bottom: "110%", width: 320, zIndex: 40 }}>
-                <div className="core" style={{ padding: "12px 14px", maxHeight: 360, overflowY: "auto" }}>
-                  {notifs.length === 0 && <div style={{ fontSize: 12, color: "var(--txt-3)", fontWeight: 500 }}>暂无通知 —— 任务状态变化会在这里出现</div>}
-                  {notifs.map((n) => {
-                    const meta = NOTIF_META[n.type] ?? NOTIF_META.completed;
-                    return (
-                      <div key={n.id} className="tl-row">
-                        <span className="chip chip-gray" style={{ height: 22, fontSize: 10 }}>{meta.label}</span>
-                        <span className="tx">{new Date(n.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</span>
-                        {n.runId && <Link className="view" style={{ color: "var(--blue)", fontSize: 11 }} href={`/runs/${n.runId}`}>查看任务</Link>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+          <Link className={`nav-item ${active === "notifications" ? "on" : ""}`} href="/notifications">
+            <I name="i-mail" size={17} />站内通知
+            {notifCount > 0 && (
+              <span className="cnt" style={{ background: notifCount > 2 ? "var(--amber-dim)" : "rgba(255,255,255,.06)", color: notifCount > 2 ? "var(--amber)" : "var(--txt-3)", borderRadius: 999, padding: "1px 8px", fontSize: 10 }}>
+                {notifCount}
+              </span>
             )}
-          </div>
+          </Link>
 
           <div className="foot">
             <span className="av">{firstLetter}</span>
