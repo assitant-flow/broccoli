@@ -75,11 +75,16 @@ export async function ensureProjectRepos(projectId: string, seedFiles: Record<st
     // 真实 GitHub 仓库：clone 远程（token 仅经 extraheader 传入；HTTP/1.1 + 防挂起 + 重试）
     await fs.mkdir(work, { recursive: true });
     await gitNet(work, opts.token, ["clone", opts.remoteUrl, "."], 180000);
+    await git(work, "config", "user.email", "agent@broccoli.dev");
+    await git(work, "config", "user.name", "Broccoli Agent");
   } else {
     const origin = originPath(projectId);
     await git(dir, "init", "--bare", "--initial-branch=main", origin);
     await fs.mkdir(work, { recursive: true });
     await git(work, "clone", origin, ".");
+    // 仓库级身份必须先于任何 commit（CI runner 无全局 git 身份）
+    await git(work, "config", "user.email", "agent@broccoli.dev");
+    await git(work, "config", "user.name", "Broccoli Agent");
     for (const [rel, content] of Object.entries(seedFiles)) {
       const p = path.join(work, rel);
       await fs.mkdir(path.dirname(p), { recursive: true });
@@ -89,8 +94,6 @@ export async function ensureProjectRepos(projectId: string, seedFiles: Record<st
     await git(work, "commit", "-m", "chore: 初始化项目骨架");
     await git(work, "push", "origin", "main");
   }
-  await git(work, "config", "user.email", "agent@broccoli.dev");
-  await git(work, "config", "user.name", "Broccoli Agent");
 }
 
 export async function currentBranch(projectId: string): Promise<string> {
