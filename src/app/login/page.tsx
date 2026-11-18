@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { IconDefs, I } from "@/components/Icons";
@@ -11,7 +11,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("broccoli123");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [oauthReady, setOauthReady] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    api<{ configured: boolean }>("/api/auth/github/status").then((r) => setOauthReady(r.configured)).catch(() => {});
+    const qErr = new URLSearchParams(window.location.search).get("oauth_error");
+    if (qErr) setErr(`GitHub 登录失败：${qErr}`);
+  }, []);
 
   async function submit(e?: React.FormEvent, demo = false) {
     e?.preventDefault();
@@ -63,7 +70,12 @@ export default function LoginPage() {
         <button className="btn btn-ghost" style={{ width: "100%", justifyContent: "center", marginTop: 12 }} disabled={busy} onClick={() => submit(undefined, true)}>
           一键体验（演示账号）
         </button>
-        <div className="onb-note" style={{ textAlign: "center" }}>MVP：邮箱 + 密码简单认证 · GitHub OAuth 为 P1</div>
+        {oauthReady && (
+          <a className="btn btn-ghost" style={{ width: "100%", justifyContent: "center", marginTop: 10, borderColor: "rgba(52,211,153,.4)" }} href="/api/auth/github/start">
+            使用 GitHub 登录<I name="i-arrow" size={14} />
+          </a>
+        )}
+        <div className="onb-note" style={{ textAlign: "center" }}>MVP：邮箱 + 密码认证 · GitHub OAuth 登录（配置后启用）</div>
       </div></div>
     </div>
   );
