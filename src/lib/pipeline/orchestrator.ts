@@ -14,6 +14,7 @@ import {
   issues,
   runMessages,
   requirements,
+  requirementBatches,
   projects,
   pullRequests,
   usageRecords,
@@ -199,16 +200,21 @@ export async function startQueuedRuns(): Promise<number> {
       continue;
     }
 
-    // 创建 6 个阶段实例（模型解析落库，FR-D10/D17）
+    // 创建 6 个阶段实例（模型解析落库，FR-D10/D17；批次临时覆盖优先，FR-D18）
     const models = await resolveStageModels(project.id);
+    let batchOverrides: Record<string, string> = {};
+    if (requirement.batchId) {
+      const [batch] = await db.select().from(requirementBatches).where(eq(requirementBatches.id, requirement.batchId)).limit(1);
+      batchOverrides = batch?.stageModelOverrides ?? {};
+    }
     await db.insert(taskStages).values(
       STAGE_TYPES.map((t, i) => ({
         runId: run.id,
         type: t,
         seq: i,
         state: "queued" as const,
-        modelKey: models[t].key,
-        modelSource: models[t].source,
+        modelKey: batchOverrides[t] ?? models[t].key,
+        modelSource: batchOverrides[t] ? "override" : models[t].source,
       })),
     );
 

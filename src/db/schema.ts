@@ -66,6 +66,8 @@ export const requirementBatches = pgTable("requirement_batches", {
   projectId: uuid("project_id").notNull(),
   /** pause | skip_continue（批次快照策略，FR-C3） */
   failurePolicy: text("failure_policy").notNull().default("pause"),
+  /** 阶段模型临时覆盖（FR-D18）：{ [stageType]: modelKey }，仅对该批次任务生效 */
+  stageModelOverrides: jsonb("stage_model_overrides").$type<Record<string, string>>().notNull().default({}),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 

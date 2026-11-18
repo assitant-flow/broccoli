@@ -15,5 +15,31 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+
+  app:
+    build: .
+    container_name: broccoli-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://broccoli:broccoli@postgres:5432/broccoli
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me}
+      BROCCOLI_MASTER_KEY: ${BROCCOLI_MASTER_KEY:-dev-master-key-change-me-32bytes!!}
+      BROCCOLI_MAX_CONCURRENCY: ${BROCCOLI_MAX_CONCURRENCY:-2}
+      BROCCOLI_SNAPSHOT_TTL_HOURS: ${BROCCOLI_SNAPSHOT_TTL_HOURS:-24}
+      BROCCOLI_ENGINE: ${BROCCOLI_ENGINE:-mock}
+      BROCCOLI_DATA_DIR: /app/.data
+      BROCCOLI_SITE_URL: ${BROCCOLI_SITE_URL:-http://localhost:3000}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - broccoli-data:/app/.data
+
 volumes:
   broccoli-pgdata:
+  broccoli-data:

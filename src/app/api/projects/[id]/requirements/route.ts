@@ -4,6 +4,8 @@ import { and, eq, sql } from "drizzle-orm";
 import { getSessionUser, unauthorized } from "@/lib/auth";
 import { ok, bad } from "@/lib/api";
 import { createRunForRequirement } from "@/lib/pipeline/orchestrator";
+import { STAGE_TYPES } from "@/lib/env";
+import type { StageType } from "@/lib/env";
 
 /** 提交需求队列（FR-C1/C3）：一次多条，形成有序队列，批次记录失败策略 */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -13,12 +15,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [project] = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.userId, user.id))).limit(1);
   if (!project) return bad("项目不存在", 404, "NOT_FOUND");
 
-  const { items, failurePolicy } = (await req.json()) as { items: string[]; failurePolicy?: string };
+  const { items, failurePolicy, stageModelOverrides } = (await req.json()) as {
+    items: string[]; failurePolicy?: string; stageModelOverrides?: Record<string, string>;
+  };
   const titles = (items ?? []).map((s) => s.trim()).filter(Boolean);
   if (!titles.length) return bad("至少一条需求");
 
   const policy = failurePolicy === "skip_continue" ? "skip_continue" : "pause";
-  const [batch] = await db.insert(requirementBatches).values({ projectId: id, failurePolicy: policy }).returning();
+  // FR-D18：阶段模型临时覆盖——仅对该批次任务生效，不改动项目默认
+  const overrides: Record<string, string> = {};
+  for (const [stageType, modelKey] of Object.entries(stageModelOverrides ?? {})) {
+    if (STAGE_TYPES.includes(stageType as StageType) && modelKey?.trim()) overrides[stageType] = modelKey.trim();
+  }
+  const [batch] = await db.insert(requirementBatches).values({ projectId: id, failurePolicy: policy, stageModelOverrides: overrides }).returning();
   if (failurePolicy) {
     await db.update(projects).set({ failurePolicy: policy }).where(eq(projects.id, id));
   }

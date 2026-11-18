@@ -38,6 +38,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [busy, setBusy] = useState(false);
   const [issueList, setIssueList] = useState<Issue[]>([]);
   const [diffView, setDiffView] = useState<{ title: string; content: string } | null>(null);
+  const [showModelOverride, setShowModelOverride] = useState(false);
+  const [modelOverrides, setModelOverrides] = useState<Record<string, string>>({});
   const composeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -126,8 +128,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     if (!items.length) return;
     setBusy(true);
     try {
-      await api(`/api/projects/${id}/requirements`, { method: "POST", body: JSON.stringify({ items, failurePolicy: policy }) });
+      await api(`/api/projects/${id}/requirements`, {
+        method: "POST",
+        body: JSON.stringify({ items, failurePolicy: policy, stageModelOverrides: modelOverrides }),
+      });
       setDraft("");
+      setModelOverrides({});
     } finally {
       setBusy(false);
     }
@@ -198,6 +204,33 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   提交<I name="i-arrow" size={14} />
                 </button>
               </div>
+              <details style={{ marginTop: 12, borderTop: "1px dashed var(--line)", paddingTop: 10 }} onToggle={(e) => setShowModelOverride(Boolean((e as unknown as { open: boolean }).open))}>
+                <summary style={{ fontSize: 12, fontWeight: 700, color: "var(--txt-3)", cursor: "pointer" }}>
+                  高级：阶段模型临时覆盖（FR-D18 · 仅对本次提交批次生效，不改动项目默认{Object.keys(modelOverrides).length > 0 ? ` · 已覆盖 ${Object.keys(modelOverrides).length} 个阶段` : ""}）
+                </summary>
+                {showModelOverride && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginTop: 10 }}>
+                    {[["planning", "规划"], ["dev", "开发"], ["test_design", "测试用例"], ["test_run", "测试执行"], ["acceptance", "验收"], ["delivery", "交付"]].map(([t, label]) => (
+                      <div key={t} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--txt-2)", width: 62 }}>{label}</span>
+                        <select
+                          value={modelOverrides[t] ?? ""}
+                          onChange={(e) => {
+                            const next = { ...modelOverrides };
+                            if (e.target.value) next[t] = e.target.value;
+                            else delete next[t];
+                            setModelOverrides(next);
+                          }}
+                          style={{ flex: 1, height: 32, borderRadius: 10, border: "1px solid var(--line-2)", background: "rgba(255,255,255,.04)", color: "var(--txt)", fontSize: 11.5, fontFamily: "var(--mono)", outline: "none" }}
+                        >
+                          <option value="">跟随项目配置</option>
+                          {["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"].map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </details>
             </div>
           </div>
 

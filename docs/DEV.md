@@ -1,8 +1,10 @@
 # Broccoli 开发与运行指南
 
-> 本仓库已实现 [requirements](requirements.md) / [design](design.md) 定义的 **MVP 全部 P0 功能**，并附带离线演示模式（无需 Anthropic key / GitHub 授权即可端到端跑通）。本文档说明如何运行、演示脚本覆盖哪些验收路径、以及与设计文档的偏差清单。**当前状态：`pnpm smoke` 50 项断言全绿（真实 LLM 引擎）；`pnpm verify:github` 13 项全绿（真实 GitHub 集成）；`pnpm verify:suspend` 11 项全绿（挂起路径）。**
+> 本仓库已实现 [requirements](requirements.md) / [design](design.md) 定义的 **MVP 全部 P0 功能**，并附带离线演示模式（无需 Anthropic key / GitHub 授权即可端到端跑通）。本文档说明如何运行、演示脚本覆盖哪些验收路径、以及与设计文档的偏差清单。**当前状态：`pnpm smoke` 53 项断言全绿（真实 LLM 引擎，含 FR-D18 批次模型覆盖）；`pnpm verify:github` 13 项全绿（真实 GitHub 集成）；`pnpm verify:suspend` 11 项全绿（挂起路径）。**
 
 ## 快速开始
+
+> CI：GitHub Actions（push/PR 触发）—— typecheck + 完整 e2e smoke（Postgres service 容器）。Docker：`docker compose up -d postgres app`（应用镜像多阶段构建，数据库走 compose 服务）。
 
 ```bash
 # 0. 依赖：Node ≥ 22、Docker（跑 Postgres）、pnpm

@@ -370,7 +370,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                     <span className="cn-name">{STAGE_NAMES[t]}</span>
                     <span className={`cn-chip ${chip.cls}`}>{chip.label}</span>
                   </div>
-                  <span className="cn-model"><I name="i-zap" size={10} />{s.modelKey ?? "—"} · {s.modelSource === "custom" ? "自定义" : "推荐"}</span>
+                  <span className="cn-model"><I name="i-zap" size={10} />{s.modelKey ?? "—"} · {s.modelSource === "override" ? "临时覆盖" : s.modelSource === "custom" ? "自定义" : "推荐"}</span>
                   <div className="cn-meta">
                     耗时 {fmtDuration(s.startedAt, s.endedAt)}
                     {t === "dev" && run && run.repairRound > 0 ? ` · 修复轮次 ${run.repairRound}` : ""}
@@ -417,7 +417,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                   <div className="sg-h">阶段说明</div>
                   <div className="sg-desc">{selStage.summary ?? "等待启动 — 该阶段将按实现计划执行。"}</div>
                   <div style={{ marginTop: 12 }}>
-                    <div className="sg-kv">模型<span className="v">{selStage.modelKey}（{selStage.modelSource === "custom" ? "自定义" : "推荐"}）</span></div>
+                    <div className="sg-kv">模型<span className="v">{selStage.modelKey}（{selStage.modelSource === "override" ? "临时覆盖" : selStage.modelSource === "custom" ? "自定义" : "推荐"}）</span></div>
                     <div className="sg-kv">耗时<span className="v">{fmtDuration(selStage.startedAt, selStage.endedAt)}</span></div>
                     <div className="sg-kv">开始<span className="v">{selStage.startedAt ? new Date(selStage.startedAt).toLocaleTimeString("zh-CN") : "—"}</span></div>
                   </div>

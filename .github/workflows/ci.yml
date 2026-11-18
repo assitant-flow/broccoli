@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm exec tsc --noEmit
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: typecheck
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: broccoli
+          POSTGRES_PASSWORD: broccoli
+          POSTGRES_DB: broccoli
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U broccoli"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://broccoli:broccoli@localhost:5432/broccoli
+      SESSION_SECRET: ci-session-secret
+      BROCCOLI_MASTER_KEY: ci-master-key-32bytes!!
+      BROCCOLI_ENGINE: mock
+      BROCCOLI_DATA_DIR: .data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Push DB schema
+        run: pnpm exec drizzle-kit push --force
+      - name: Seed
+        run: pnpm seed
+      - name: Start server
+        run: |
+          pnpm dev > /tmp/broccoli-dev.log 2>&1 &
+          for i in $(seq 1 30); do
+            sleep 2
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/auth/me || true)
+            if [ "$code" = "401" ] || [ "$code" = "200" ]; then echo "server ready"; break; fi
+          done
+          grep -q "scheduler. started" /tmp/broccoli-dev.log
+      - name: E2E smoke（50 项断言）
+        run: pnpm smoke
+      - name: Dump server log on failure
+        if: failure()
+        run: tail -50 /tmp/broccoli-dev.log

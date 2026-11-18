@@ -228,6 +228,31 @@ async function main() {
   check("项目设置：默认分支 + 环境变量（FR-B3）", projAfter.data.project.defaultBranch === "main" && projAfter.data.project.settings?.env?.API_KEY === "secret-1", JSON.stringify(projAfter.data.project?.settings ?? projAfter.data).slice(0, 160));
   void patchRes;
 
+  // 19.5 阶段模型临时覆盖（FR-D18）：仅对该批次生效
+  const cfgBefore = await http<{ stages: { stageType: string; source: string }[] }>(`/api/projects/${projA.id}/stage-configs`, "GET");
+  const ov = await http<{ requirements: { id: string; seq: number; latestRunId: string | null }[] }>(`/api/projects/${projA.id}/requirements`, "POST", {
+    items: ["新增 /api/version 端点返回当前版本号"],
+    stageModelOverrides: { dev: "claude-opus-4-6", test_run: "claude-opus-4-6" },
+  });
+  check("提交批次带阶段模型覆盖（FR-D18）", ov.status === 200);
+  const ovDone = await waitFor("覆盖批次任务完成", async () => {
+    const d = await A();
+    return d.requirements.find((r) => r.seq === ov.data.requirements[0].seq)!.status === "done";
+  }, 420000);
+  check("覆盖批次任务完成", ovDone);
+  const ovRun = (await A()).requirements.find((r) => r.seq === ov.data.requirements[0].seq)!.latestRunId!;
+  const ovCanvas = await http<{ stages: { type: string; modelKey: string; modelSource: string }[] }>(`/api/runs/${ovRun}`, "GET");
+  check(
+    "覆盖仅对该批次生效（AC-D18）",
+    ovCanvas.data.stages.find((s) => s.type === "dev")!.modelSource === "override" && ovCanvas.data.stages.find((s) => s.type === "dev")!.modelKey === "claude-opus-4-6",
+    `dev=${ovCanvas.data.stages.find((s) => s.type === "dev")!.modelKey}/${ovCanvas.data.stages.find((s) => s.type === "dev")!.modelSource}`,
+  );
+  const cfgAfter = await http<{ stages: { stageType: string; source: string }[] }>(`/api/projects/${projA.id}/stage-configs`, "GET");
+  check(
+    "项目默认配置未被覆盖改动（AC-D18）",
+    cfgBefore.data.stages.every((s) => cfgAfter.data.stages.find((x) => x.stageType === s.stageType)?.source === s.source),
+  );
+
   // 20. 依赖图（v2α）：@N 语法声明依赖 → 依赖失败 → 级联跳过
   await http(`/api/projects/${projB.id}/requirements`, "POST", {
     items: ["@3 [fail-tests] 依赖失败级联示范", "@4 普通后续需求"],
