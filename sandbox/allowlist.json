@@ -1,0 +1,4 @@
+{
+  "prepare": ["registry.npmjs.org", "registry.yarnpkg.com", "pypi.org", "files.pythonhosted.org"],
+  "execute": ["api.anthropic.com", "api.github.com", "github.com", "objects.githubusercontent.com"]
+}

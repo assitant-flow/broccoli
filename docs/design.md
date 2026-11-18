@@ -52,7 +52,7 @@
 | API | Next.js Route Handlers（REST） | 简单直接，SSE 同源 | tRPC |
 | 数据库 | PostgreSQL 16 + Drizzle ORM | 状态机/队列查询能力强 | Prisma |
 | 队列/锁/缓冲 | Redis 7 + BullMQ | 延迟任务（快照过期）、分布式锁、pub/sub 日志 | — |
-| 沙箱 | Docker 容器（专用 VM 池，非特权、只读根） | MVP 最简可靠；v2 升级 gVisor/Firecracker | Firecracker |
+| 沙箱 | Docker 容器（非特权：只读根/tmpfs/CPU/内存/PIDs/cap-drop ALL；队列复用；internal 网络 + 白名单 egress proxy）。`BROCCOLI_SANDBOX=docker` 启用，**已验证 13/13**（pnpm verify:sandbox）；默认 local 宿主模式（开发/CI） | v2: gVisor/Firecracker + Linux iptables 透明拦截 |
 | Agent 引擎 | Claude Code Agent SDK（`@anthropic-ai/claude-agent-sdk`） | 官方 SDK：会话恢复、permission 回调、流式输出 | 抽象层 `EngineAdapter` 可替换 |
 | 对象存储 | S3 / R2（快照 patch、日志归档） | 便宜、生命周期策略清理过期快照 | — |
 | 邮件 | Resend | Transactional 邮件最简接入 | SES |

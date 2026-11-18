@@ -1,7 +1,5 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { execFile } from "child_process";
-import { promisify } from "node:util";
 import { env } from "@/lib/env";
 import { commitAll, diffStat, changedFiles, workPath } from "@/lib/git";
 import {
@@ -232,17 +230,11 @@ export class MockEngine implements ExecutionEngine {
       return { summary: "项目未配置测试命令，阶段自动跳过", artifacts: [], skipped: true, tokens: { in: 400, out: 50 } };
     }
 
-    const run = promisify(execFile);
-    let stdout = "";
-    let failed = false;
-    try {
-      const res = await run("node", ["--test", "tests/*.test.mjs"], { cwd: work, maxBuffer: 1024 * 1024 * 8, shell: true });
-      stdout = res.stdout;
-    } catch (err: unknown) {
-      failed = true;
-      stdout = String((err as { stdout?: string }).stdout ?? err);
-    }
-    const reportKey = await writeArtifact(ctx.runId, "测试报告.md", `# 测试报告 · ${ctx.requirement.title}\n\n\`\`\`\n${stdout}\n\`\`\`\n`);
+    // 测试执行经沙箱抽象（BROCCOLI_SANDBOX=docker 时在容器内运行，FR-H2）
+    const { getSandbox } = await import("@/lib/sandbox");
+    const sbx = await getSandbox();
+    const { stdout, failed } = await sbx.exec(ctx.projectId, ["node", "--test", "tests/*.test.mjs"], { timeoutMs: 180000 });
+    const reportKey = await writeArtifact(ctx.runId, "测试报告.md", `# 测试报告 · ${ctx.requirement.title}\n\n沙箱：${sbx.name}\n\n\`\`\`\n${stdout}\n\`\`\`\n`);
     if (failed) {
       const m = stdout.match(/# fail (\d+)/) ?? stdout.match(/ℹ fail (\d+)/);
       throw Object.assign(new StageFailure(`测试未全部通过（${m?.[1] ?? "?"} failed），详见测试报告`), { reportKey });

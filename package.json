@@ -11,7 +11,8 @@
     "seed": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/seed.ts",
     "smoke": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/smoke.ts",
     "verify:suspend": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-suspend.ts",
-    "verify:github": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-github.ts"
+    "verify:github": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-github.ts",
+    "verify:sandbox": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-sandbox.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.0",

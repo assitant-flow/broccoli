@@ -30,6 +30,7 @@ import { resolveGithubToken, createPullRequest, mergePullRequest, closePullReque
 import { resolveStageModels, type StageModel } from "@/lib/models";
 import { notify } from "@/lib/notify";
 import { slugify } from "@/lib/engine/types";
+import { getSandbox } from "@/lib/sandbox";
 
 /** github origin 的 git 鉴权参数（token 解析：平台 env → 用户 PAT；design §12 窗口注入） */
 async function originOpts(project: typeof projects.$inferSelect): Promise<GitOriginOpts> {
@@ -77,6 +78,16 @@ async function releaseLease(runId: string, reason: string) {
     .update(containerLeases)
     .set({ state: "released", releasedAt: new Date(), reason })
     .where(and(eq(containerLeases.runId, runId), ne(containerLeases.state, "released")));
+  // docker 沙箱：队列空闲/终态即释放容器（FR-H3 空闲回收）
+  try {
+    const [run] = await db.select({ projectId: taskRuns.projectId }).from(taskRuns).where(eq(taskRuns.id, runId)).limit(1);
+    if (run) {
+      const sbx = await getSandbox();
+      await sbx.release(run.projectId);
+    }
+  } catch {
+    /* local 模式无容器 */
+  }
 }
 
 async function acquireLease(run: { id: string; projectId: string; userId: string }): Promise<boolean> {
@@ -195,6 +206,14 @@ export async function startQueuedRuns(): Promise<number> {
       const origin = await originOpts(project);
       await ensureProjectRepos(project.id, {}, origin);
       await checkoutBranchFrom(project.id, branch, baseBranch, origin);
+      // 沙箱就绪（docker 模式：基础设施 + 项目容器；失败回落宿主执行并记录）
+      const sbx = await getSandbox();
+      try {
+        await sbx.ensureForRun(project.id, workPath(project.id));
+        await logLine(run.id, null, "info", `📦 沙箱就绪（${sbx.name}）`);
+      } catch (err) {
+        await logLine(run.id, null, "warn", `⚠ 沙箱就绪失败（${String(err).slice(0, 80)}）— 该任务回落宿主执行`);
+      }
     } catch (err) {
       await failRun(claimed.id, null, `环境准备失败：${String(err)}`);
       continue;

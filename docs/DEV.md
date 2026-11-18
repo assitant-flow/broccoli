@@ -1,6 +1,6 @@
 # Broccoli 开发与运行指南
 
-> 本仓库已实现 [requirements](requirements.md) / [design](design.md) 定义的 **MVP 全部 P0 功能**，并附带离线演示模式（无需 Anthropic key / GitHub 授权即可端到端跑通）。本文档说明如何运行、演示脚本覆盖哪些验收路径、以及与设计文档的偏差清单。**当前状态：`pnpm smoke` 53 项断言全绿（真实 LLM 引擎，含 FR-D18 批次模型覆盖）；`pnpm verify:github` 13 项全绿（真实 GitHub 集成）；`pnpm verify:suspend` 11 项全绿（挂起路径）。**
+> 本仓库已实现 [requirements](requirements.md) / [design](design.md) 定义的 **MVP 全部 P0 功能**，并附带离线演示模式（无需 Anthropic key / GitHub 授权即可端到端跑通）。本文档说明如何运行、演示脚本覆盖哪些验收路径、以及与设计文档的偏差清单。**当前状态：`pnpm smoke` 53 项断言全绿（真实 LLM 引擎，含 FR-D18 批次模型覆盖）；`pnpm verify:github` 13 项（真实 GitHub 集成）；`pnpm verify:suspend` 11 项（挂起路径）；`pnpm verify:sandbox` 13 项（沙箱容器+网络白名单）——全部通过。**
 
 ## 快速开始
 
@@ -27,6 +27,8 @@ pnpm smoke
 ```
 
 演示账号：`thomas@broccoli.dev` / `broccoli123`（登录页有「一键体验」按钮）。
+
+**沙箱模式**：`.env` 配置 `BROCCOLI_SANDBOX=docker` 后，每队列一个非特权容器（只读根、tmpfs /tmp、512MB/1CPU/PIDs 128、cap-drop ALL、no-new-privileges；随队列复用、空闲/终态回收），容器挂 internal 网络、唯一出口为白名单 egress proxy（分阶段规则：prepare=依赖 registry，execute=Anthropic/GitHub 域；判定写审计日志）。专项验证：`pnpm verify:sandbox`（基建 8 项 + 集成 5 项，全部通过）。剩余风险：进程绕过 proxy env 的直连由 internal 网络收敛、v2 透明拦截（见 design §12）。
 
 **真实 LLM 模式**：`.env` 中 `BROCCOLI_ENGINE=claude` + `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_MODEL`（已验证：本地 AI router 代理 GLM）。规划与验收由真实模型产出；模型输出异常自动降级模板逻辑保证流水线韧性；验收采用机械护栏判定（校验类标准对照源码核验、行为类标准以测试证据支撑）防 LLM 判定波动。
 

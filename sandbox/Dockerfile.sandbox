@@ -1,0 +1,6 @@
+# Broccoli 沙箱执行镜像：node + git + curl（非 root 运行，配合运行时只读根 + 资源限额）
+FROM node:22-alpine
+RUN apk add --no-cache git curl
+WORKDIR /workspace
+USER node
+CMD ["sleep", "infinity"]

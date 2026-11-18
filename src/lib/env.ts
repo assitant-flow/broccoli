@@ -6,6 +6,8 @@ export const env = {
   snapshotTtlHours: Number(process.env.BROCCOLI_SNAPSHOT_TTL_HOURS ?? 24),
   dataDir: process.env.BROCCOLI_DATA_DIR ?? ".data",
   engine: (process.env.BROCCOLI_ENGINE ?? "mock") as "mock" | "claude",
+  /** 执行沙箱：local（宿主进程，开发/CI）| docker（容器隔离 + 白名单 egress proxy） */
+  sandbox: (process.env.BROCCOLI_SANDBOX ?? "local") as "local" | "docker",
   /** Anthropic 兼容 API（可指向本地 router / 代理；默认官方端点） */
   anthropicBaseUrl: (process.env.ANTHROPIC_BASE_URL ?? "https://api.anthropic.com").replace(/\/$/, ""),
   /** 覆盖全部阶段的模型名（如 router 的 glm:glm-5.3[1m]）；空 = 用各阶段配置的 claude-* 模型 */
