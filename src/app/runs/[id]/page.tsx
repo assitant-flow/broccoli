@@ -86,6 +86,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   const [freeText, setFreeText] = useState("");
   const [busy, setBusy] = useState(false);
   const [artifactView, setArtifactView] = useState<{ name: string; content: string } | null>(null);
+  const [modelSaving, setModelSaving] = useState(false);
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -161,6 +162,17 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
       setFreeText("");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function changeStageModel(stageType: string, modelKey: string) {
+    setModelSaving(true);
+    try {
+      await api(`/api/projects/${data?.project?.id}/stage-configs`, { method: "PUT", body: JSON.stringify({ updates: [{ stageType, modelKey }] }) });
+      const fresh = await api<Canvas>(`/api/runs/${id}`);
+      setData(fresh);
+    } finally {
+      setModelSaving(false);
     }
   }
 
@@ -445,7 +457,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
             <button className="btn btn-ghost btn-sm" onClick={resetLayout} title="恢复默认画布布局">重置布局</button>
             <Link className="btn btn-ghost btn-sm" href={`/projects/${data?.project?.id}`}><I name="i-sliders" size={13} />阶段与模型配置</Link>
           </div>
-          <div className="shell"><div className="canvas-wrap" ref={canvasWrapRef}>
+          <div className="shell"><div className="canvas-wrap"><div className="canvas-inner" ref={canvasWrapRef}>
             <svg className="edges" width="100%" height="620">
               {edges.map((e, i) => <path key={i} className={e.c} d={e.d} />)}
             </svg>
@@ -498,7 +510,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                 <div className="sub">push 分支 + 堆叠 PR + 记忆提案</div>
               </div>
             </div>
-          </div></div>
+          </div></div></div>
 
           {/* 选中阶段检查器（FR-D16） */}
           {selStage && (
@@ -515,7 +527,17 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                   <div className="sg-h">阶段说明</div>
                   <div className="sg-desc">{selStage.summary ?? "等待启动 — 该阶段将按实现计划执行。"}</div>
                   <div style={{ marginTop: 12 }}>
-                    <div className="sg-kv">模型<span className="v">{selStage.modelKey}（{selStage.modelSource === "override" ? "临时覆盖" : selStage.modelSource === "custom" ? "自定义" : "推荐"}）</span></div>
+                    <div className="sg-kv">模型
+                      <select
+                        value={selStage.modelKey ?? ""}
+                        disabled={modelSaving}
+                        onChange={(e) => changeStageModel(selected, e.target.value)}
+                        style={{ appearance: "none", outline: "none", cursor: "pointer", height: 28, borderRadius: 9, border: "1px solid var(--line-2)", background: "rgba(255,255,255,.05)", color: "var(--txt)", fontSize: 10.5, fontFamily: "var(--mono)", padding: "0 8px" }}
+                      >
+                        {["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"].map((m) => <option key={m} value={m} style={{ background: "#0b0e0c" }}>{m}</option>)}
+                      </select>
+                      <span className="v" style={{ marginLeft: 4 }}>{selStage.modelSource === "override" ? "临时覆盖" : selStage.modelSource === "custom" ? "自定义" : "推荐"}</span>
+                    </div>
                     <div className="sg-kv">耗时<span className="v">{fmtDuration(selStage.startedAt, selStage.endedAt)}</span></div>
                     <div className="sg-kv">开始<span className="v">{selStage.startedAt ? new Date(selStage.startedAt).toLocaleTimeString("zh-CN") : "—"}</span></div>
                   </div>

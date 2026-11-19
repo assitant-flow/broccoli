@@ -40,6 +40,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [issueList, setIssueList] = useState<Issue[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [diffView, setDiffView] = useState<{ title: string; content: string } | null>(null);
+  const [dragSeqId, setDragSeqId] = useState<string | null>(null);
   const [showModelOverride, setShowModelOverride] = useState(false);
   const [modelOverrides, setModelOverrides] = useState<Record<string, string>>({});
   const composeRef = useRef<HTMLDivElement>(null);
@@ -117,6 +118,22 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     setBusy(true);
     try {
       await api(`/api/projects/${id}/issues`, { method: "POST", body: JSON.stringify({ issueIds: [issueId] }) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dragReorder(target: Req, overId: string) {
+    const queued = reqs.filter((x) => x.status === "queued");
+    if (target.id === overId) return;
+    const ids = queued.map((x) => x.id);
+    const from = ids.indexOf(target.id);
+    const to = ids.indexOf(overId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    setBusy(true);
+    try {
+      await api(`/api/projects/${id}/requirements/reorder`, { method: "POST", body: JSON.stringify({ order: ids }) });
     } finally {
       setBusy(false);
     }
@@ -255,7 +272,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               const chip = STATUS_CHIP[r.status] ?? STATUS_CHIP.queued;
               const isActive = r.status === "active";
               return (
-                <div key={r.id} className={`qrow ${isActive ? (run?.state === "wait_confirm" ? "wait" : "run") : r.status === "failed" ? "failed" : r.status === "done" ? "done" : ""}`}>
+                <div
+                  key={r.id}
+                  className={`qrow ${isActive ? (run?.state === "wait_confirm" ? "wait" : "run") : r.status === "failed" ? "failed" : r.status === "done" ? "done" : ""}`}
+                  draggable={r.status === "queued"}
+                  onDragStart={() => setDragSeqId(r.id)}
+                  onDragOver={(e) => { if (dragSeqId && dragSeqId !== r.id && r.status === "queued") e.preventDefault(); }}
+                  onDrop={(e) => { e.preventDefault(); if (dragSeqId) { const dragged = reqs.find((x) => x.id === dragSeqId); if (dragged && dragged.status === "queued") void dragReorder(dragged, r.id); setDragSeqId(null); } }}
+                  onDragEnd={() => setDragSeqId(null)}
+                  style={r.status === "queued" ? { cursor: "grab" } : undefined}
+                >
                   <div className="r1">
                     <span className="no">#{r.seq}</span>
                     <span className="ttl">{r.title}</span>

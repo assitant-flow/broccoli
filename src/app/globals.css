@@ -202,8 +202,9 @@ input, textarea, select { font: inherit; color: var(--txt); }
 .legend { display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--txt-3); font-weight: 600; flex-wrap: wrap; }
 .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
 .legend .lq { border-radius: 3px; background: transparent; border: 1.5px dashed var(--line-2); width: 9px; height: 9px; }
-.canvas-wrap { position: relative; height: 620px; border-radius: calc(var(--r-shell) - 7px); overflow: hidden;
-  background: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px) 0 0 / 24px 24px, #070908; border: 1px solid var(--line); }
+.canvas-wrap { position: relative; height: 620px; border-radius: calc(var(--r-shell) - 7px); overflow-x: auto; overflow-y: hidden; background: #070908; border: 1px solid var(--line); }
+.canvas-inner { position: relative; height: 620px; min-width: 1110px;
+  background: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px) 0 0 / 24px 24px, #070908; }
 .edges { position: absolute; inset: 0; pointer-events: none; }
 .edge { fill: none; stroke: rgba(255, 255, 255, 0.16); stroke-width: 1.5; }
 .edge.done { stroke: rgba(52, 211, 153, 0.4); }
@@ -212,7 +213,7 @@ input, textarea, select { font: inherit; color: var(--txt); }
 .cnode { position: absolute; border-radius: 16px; background: rgba(15, 18, 16, 0.96); border: 1px solid var(--line-2); padding: 13px 14px;
   box-shadow: 0 12px 34px -20px rgba(0, 0, 0, 0.95); cursor: pointer; transition: border-color 0.4s var(--ease), box-shadow 0.4s var(--ease); }
 .cnode:hover { border-color: rgba(255, 255, 255, 0.3); }
-.cnode.sel { outline: 1.5px solid rgba(125, 211, 252, 0.5); }
+.cnode.sel { outline: none; border-color: rgba(125, 211, 252, 0.55); box-shadow: 0 0 0 1.5px rgba(125, 211, 252, 0.35), inset 0 0 0 0.5px rgba(125, 211, 252, 0.3), 0 12px 34px -20px rgba(0, 0, 0, 0.95); }
 .cnode.done { border-color: rgba(52, 211, 153, 0.4); }
 .cnode.run { border-color: rgba(52, 211, 153, 0.55); box-shadow: 0 12px 44px -14px rgba(16, 185, 129, 0.5); }
 .cnode.wait { border-color: var(--amber-line); box-shadow: 0 12px 44px -14px rgba(245, 158, 11, 0.42); }
@@ -405,3 +406,19 @@ input, textarea, select { font: inherit; color: var(--txt); }
 .cnode.dragging,
 .stage-pill.dragging { transition: none !important; outline: none !important; cursor: grabbing !important; }
 .cnode.dragging:hover { border-color: var(--line-2); }
+
+/* ============ 响应式（≤900px）：侧栏顶置横排 + 容器 wrap ============ */
+@media (max-width: 900px) {
+  .app { flex-direction: column; }
+  .side { width: 100%; flex-direction: row; align-items: center; padding: 10px 12px; gap: 4px; overflow-x: auto;
+    border-right: none; border-bottom: 1px solid var(--line); background: rgba(5, 5, 7, 0.92); position: sticky; top: 0; z-index: 20; }
+  .logo { padding: 0 10px 0 0; flex: none; }
+  .logo .tag { display: none; }
+  .nav-item { height: 36px; padding: 0 10px; white-space: nowrap; font-size: 12.5px; flex: none; }
+  .side .foot { display: none; }
+  .main { padding: 16px 16px 28px; }
+  .topbar, .phd, .mem-hd, .task-hd, .steps, .para-viz, .cv-toolbar { flex-wrap: wrap; }
+  .topbar .hi { font-size: 16px; }
+  .zoom { display: none; }
+  .alerts { grid-template-columns: 1fr; }
+}

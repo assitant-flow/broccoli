@@ -21,12 +21,12 @@ interface Msg {
   content: string;
 }
 
-async function callClaude(key: string, model: string, system: string, messages: Msg[], maxTokens = 4000): Promise<string> {
+async function callClaude(key: string, baseUrl: string, model: string, system: string, messages: Msg[], maxTokens = 4000): Promise<string> {
   // 网络层重试（fetch failed / 超时等瞬时抖动重试 2 次；HTTP 业务错误不重试）
   let lastNetErr: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(`${env.anthropicBaseUrl}/v1/messages`, {
+      const res = await fetch(`${baseUrl}/v1/messages`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -67,10 +67,10 @@ function extractJson<T>(text: string): T {
 }
 
 /** LLM JSON 调用（解析失败自动重试一次——应对偶发截断/格式抖动） */
-async function callClaudeJson<T>(key: string, model: string, system: string, user: string, maxTokens = 4000): Promise<T> {
+async function callClaudeJson<T>(key: string, baseUrl: string, model: string, system: string, user: string, maxTokens = 4000): Promise<T> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await callClaude(key, model, system, [{ role: "user", content: attempt === 0 ? user : `${user}\n\n（上一次输出不是合法 JSON，请严格只输出 JSON，不要任何多余文字）` }], maxTokens);
+    const raw = await callClaude(key, baseUrl, model, system, [{ role: "user", content: attempt === 0 ? user : `${user}\n\n（上一次输出不是合法 JSON，请严格只输出 JSON，不要任何多余文字）` }], maxTokens);
     try {
       return extractJson<T>(raw);
     } catch (err) {
@@ -89,9 +89,10 @@ export class ClaudeEngine implements ExecutionEngine {
   readonly name = "claude" as const;
   private mock = new MockEngine();
 
-  constructor(private key: string) {}
+  constructor(private cfg: { key: string; baseUrl?: string; model?: string }) {}
 
   private modelFor(_stage: StageContext["stageType"]): string {
+    if (this.cfg.model) return this.cfg.model; // 用户接入设置覆盖（v2β）
     if (env.anthropicModel) return env.anthropicModel;
     const map: Record<string, string> = {
       planning: "claude-opus-4-6",
@@ -117,7 +118,8 @@ export class ClaudeEngine implements ExecutionEngine {
       await sleep(200);
       try {
         const parsed = await callClaudeJson<{ summary: string; subtaskTitles: string[]; criteria: { content: string; verifyStage: string }[] }>(
-          this.key,
+          this.cfg.key,
+          this.cfg.baseUrl ?? env.anthropicBaseUrl,
           model,
           "你是 Broccoli 平台的规划 agent。读取项目记忆与需求，将需求拆解为子任务并给出客观可核验的验收标准。严格只输出 JSON，不要输出任何其他文字。",
           `项目记忆与上下文：\n${memoryBlock}\n\n需求 #${ctx.requirement.seq}：${ctx.requirement.title}\n描述：${ctx.requirement.description}\n${ctx.confirmAnswer ? `用户已确认技术选型：${ctx.confirmAnswer}（计划与标准必须与该选型一致）\n` : ""}\n输出 JSON（schema 固定）：\n{"summary":"一句话计划摘要","subtaskTitles":["子任务1","子任务2","子任务3"],"criteria":[{"content":"可核验标准","verifyStage":"dev|test_run|delivery"}]}\n要求：criteria 恰好 4 条，verifyStage 按可验证性分配（实现一致性→dev、测试与校验→test_run、PR 描述与文档→delivery）。`,
@@ -221,7 +223,8 @@ export class ClaudeEngine implements ExecutionEngine {
       let summary = `验收对照完成：${updates.filter((u) => u.status === "achieved").length}/${ctx.criteria.length} 达成${updates.some((u) => u.status === "failed") ? "，存在待回溯修复项" : ""}`;
       try {
         const parsed = await callClaudeJson<{ summary: string }>(
-          this.key,
+          this.cfg.key,
+          this.cfg.baseUrl ?? env.anthropicBaseUrl,
           model,
           "你是 Broccoli 平台的验收 agent。基于给定的判定结果写一句话总结。严格只输出 JSON。",
           `需求：${ctx.requirement.title}\n修复轮次：${ctx.repairRound}\n判定结果：\n${ctx.criteria.map((c) => `${c.seq}. [${c.verifyStage}] ${c.content} → ${updates.find((u) => u.seq === c.seq)?.status}`).join("\n")}\n\n输出 JSON：{"summary":"一句话验收结论（引用关键证据）"}`,

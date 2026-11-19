@@ -15,7 +15,13 @@ import type { ExecutionEngine } from "./types";
  */
 export async function getEngine(userId: string): Promise<ExecutionEngine> {
   if (env.engine === "claude") {
-    if (env.anthropicAuthToken) return new ClaudeEngine(env.anthropicAuthToken);
+    // ① 用户接入设置（v2β /settings/ai：per-user baseUrl/model/token）
+    const { loadUserAiSettings } = await import("@/app/api/settings/ai/route");
+    const userAi = await loadUserAiSettings(userId);
+    if (userAi) return new ClaudeEngine(userAi);
+    // ② 平台级 env token
+    if (env.anthropicAuthToken) return new ClaudeEngine({ key: env.anthropicAuthToken });
+    // ③ 旧 BYO key（credentials provider=anthropic）
     const [cred] = await db
       .select()
       .from(credentials)
@@ -24,7 +30,7 @@ export async function getEngine(userId: string): Promise<ExecutionEngine> {
     if (cred) {
       try {
         const key = decryptSecret(cred.ciphertext);
-        if (key.trim()) return new ClaudeEngine(key);
+        if (key.trim()) return new ClaudeEngine({ key });
       } catch {
         /* 解密失败回落 mock */
       }
