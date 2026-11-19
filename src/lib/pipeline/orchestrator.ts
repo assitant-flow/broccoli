@@ -13,6 +13,7 @@ import {
   memoryInjections,
   issues,
   runMessages,
+  serviceEndpoints,
   requirements,
   requirementBatches,
   projects,
@@ -703,6 +704,27 @@ async function completeRun(
   // 记忆提案（FR-G2）
   for (const p of output.memoryProposals ?? []) {
     await db.insert(memoryProposals).values({ projectId: project.id, sourceRunId: run.id, type: p.type, content: p.content });
+  }
+
+  // 服务端点落库（v2β 产物）：交付阶段启动的服务，项目页/任务页展示访问地址
+  for (const svc of output.services ?? []) {
+    await db.insert(serviceEndpoints).values({
+      projectId: project.id,
+      runId: run.id,
+      name: svc.name,
+      url: svc.url,
+      port: svc.port,
+      pid: svc.pid,
+      status: "running",
+    });
+    await db.insert(stageArtifacts).values({
+      stageId: deliveryStage.id,
+      runId: run.id,
+      name: `服务地址 · ${svc.url}`,
+      kind: "service",
+      meta: { url: svc.url, port: svc.port, pid: svc.pid },
+    });
+    await logLine(run.id, deliveryStage.id, "ok", `🌐 服务已启动：${svc.url}（端口 ${svc.port}）`);
   }
 
   // Issues 状态回写（FR-C4）：需求关联的 open issue 随 PR 开出自动关闭（github 同步真实 API）

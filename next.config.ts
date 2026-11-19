@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
       "util", "node:util", "fs", "node:fs", "node:fs/promises", "fs/promises",
       "path", "node:path", "module", "node:module", "assert", "timers", "querystring",
       "string_decoder", "postgres",
+      "node:net", "node:tls", "node:http", "node:https", "node:os", "node:dns",
+      "node:url", "node:zlib", "node:buffer", "node:events", "node:assert",
+      "node:timers", "node:querystring", "node:string_decoder", "node:stream",
+      "node:fs/promises",
     ];
     config.externals = [...(Array.isArray(config.externals) ? config.externals : []), ...externals];
     return config;

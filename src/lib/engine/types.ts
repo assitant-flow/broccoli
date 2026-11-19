@@ -42,6 +42,8 @@ export interface StageOutput {
   memoryProposals?: { type: "convention" | "decision" | "lesson" | "fact"; content: string }[];
   /** 引擎请求用户决策 → 任务转「等待确认」（FR-D4） */
   confirm?: ConfirmQuestion;
+  /** 交付阶段启动的服务（v2β 产物）：编排器落库 service_endpoints 并展示访问地址 */
+  services?: { name: string; url: string; port: number; pid: number; logPath: string }[];
   /** 测试执行：无测试命令时跳过（FR-D9/AC-D9） */
   skipped?: boolean;
   tokens?: { in: number; out: number };

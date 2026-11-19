@@ -14,6 +14,7 @@ type Req = { id: string; seq: number; title: string; status: string; latestRunId
 type Run = { id: string; requirementId: string; state: string; currentStage: string | null; error: string | null; startedAt: string | null; endedAt: string | null };
 type Pr = { id: string; number: number; title: string; branch: string; baseBranch: string; diffStat: string; status: string };
 type Issue = { id: string; number: number; title: string; state: string; syncedRequirementId: string | null };
+type Service = { id: string; name: string; url: string; port: number; status: string; runId: string };
 type MemCounts = { confirmed: number; pending: number };
 
 const STATUS_CHIP: Record<string, { cls: string; label: string }> = {
@@ -37,6 +38,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [policy, setPolicy] = useState<"pause" | "skip_continue">("pause");
   const [busy, setBusy] = useState(false);
   const [issueList, setIssueList] = useState<Issue[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [diffView, setDiffView] = useState<{ title: string; content: string } | null>(null);
   const [showModelOverride, setShowModelOverride] = useState(false);
   const [modelOverrides, setModelOverrides] = useState<Record<string, string>>({});
@@ -71,13 +73,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     loadMem();
     const loadIssues = () => api<Issue[]>(`/api/projects/${id}/issues`).then(setIssueList).catch(() => {});
     loadIssues();
+    const loadServices = () => api<Service[]>(`/api/projects/${id}/services`).then(setServices).catch(() => {});
+    loadServices();
     const t = setInterval(load, 2500);
     const t2 = setInterval(loadMem, 4000);
     const t3 = setInterval(loadIssues, 4000);
+    const t4 = setInterval(loadServices, 5000);
     return () => {
       clearInterval(t);
       clearInterval(t2);
       clearInterval(t3);
+      clearInterval(t4);
     };
   }, [id]);
 
@@ -96,6 +102,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   async function viewPrDiff(prId: string, title: string) {
     const res = await fetch(`/api/prs/${prId}/diff`);
     setDiffView({ title, content: await res.text() });
+  }
+
+  async function stopService(svcId: string) {
+    setBusy(true);
+    try {
+      await api(`/api/services/${svcId}/stop`, { method: "POST" });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function pullIssue(issueId: string) {
@@ -342,6 +357,25 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               </div>
             ))}
             {prs.length === 0 && <div style={{ fontSize: 11.5, color: "var(--txt-3)", fontWeight: 500, padding: "4px 0 8px 36px" }}>尚无 PR —— 任务完成后自动开出堆叠 PR</div>}
+          </div></div>
+
+          <div className="shell"><div className="core" style={{ padding: "16px 20px" }}>
+            <div className="sec-hd" style={{ marginBottom: 10 }}>
+              <span className="t" style={{ fontSize: 13.5 }}>服务访问地址</span>
+              <span className="chip chip-green" style={{ marginLeft: "auto" }}>{services.filter((s) => s.status === "running").length} 运行中</span>
+            </div>
+            {services.length === 0 && <div style={{ fontSize: 11.5, color: "var(--txt-3)", fontWeight: 500 }}>暂无服务 —— 服务类任务交付后自动启动并登记访问地址（v2β）</div>}
+            {services.map((svc) => (
+              <div key={svc.id} className="tl-row" style={{ padding: "10px 0" }}>
+                <span className={`chip ${svc.status === "running" ? "chip-green" : "chip-gray"}`} style={{ height: 22, fontSize: 10 }}>{svc.status === "running" ? "运行中" : "已停止"}</span>
+                <span className="tx" style={{ flex: 1, minWidth: 0 }}>
+                  <a href={svc.url} target="_blank" rel="noreferrer" className="mono" style={{ color: svc.status === "running" ? "var(--acc)" : "var(--txt-3)", textDecoration: "underline", fontSize: 12 }}>{svc.url}</a>
+                  <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 2 }}>{svc.name}</div>
+                </span>
+                {svc.status === "running" && <button className="btn btn-ghost btn-sm" onClick={() => stopService(svc.id)}>停止</button>}
+                {svc.runId && <Link className="chip chip-gray" href={`/runs/${svc.runId}`}>任务</Link>}
+              </div>
+            ))}
           </div></div>
 
           <div className="shell"><div className="core" style={{ padding: "16px 20px" }}>

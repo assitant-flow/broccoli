@@ -308,6 +308,31 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
         </div>
       </div>
 
+      {/* 服务产物卡（v2β）：交付阶段启动的服务访问地址 */}
+      {(data?.artifacts ?? []).some((a) => a.kind === "service") && (
+        <div className="confirm-card" style={{ marginBottom: 20 }}><div className="inner" style={{ borderColor: "rgba(52,211,153,.4)", background: "linear-gradient(135deg, rgba(52,211,153,.08), rgba(52,211,153,.02) 45%), var(--bg-core)" }}>
+          <div className="q-hd">
+            <span className="cn-ic" style={{ background: "var(--acc-dim)", color: "var(--acc)", width: 34, height: 34 }}><I name="i-play" size={16} /></span>
+            <div className="qt">服务已启动 · 访问地址</div>
+            <span className="chip chip-green" style={{ marginLeft: "auto" }}><span className="dot pulse" />运行中</span>
+          </div>
+          {data!.artifacts.filter((a) => a.kind === "service").map((a) => {
+            const url = String(a.meta?.url ?? "");
+            return (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10, padding: "12px 16px", borderRadius: 14, background: "rgba(255,255,255,.04)", border: "1px solid var(--line)", flexWrap: "wrap" }}>
+                <a href={url} target="_blank" rel="noreferrer" className="mono" style={{ color: "var(--acc)", fontSize: 15, fontWeight: 700, textDecoration: "underline" }}>{url}</a>
+                <span className="chip chip-gray">端口 {String(a.meta?.port ?? "")}</span>
+                <span className="sp" style={{ flex: 1 }} />
+                <a className="btn btn-primary btn-sm" href={url} target="_blank" rel="noreferrer">打开服务<I name="i-up-r" size={13} /></a>
+              </div>
+            );
+          })}
+          <div className="aft">
+            <span className="note"><I name="i-shield" size={13} />服务随任务交付启动并持久运行 · 项目页同步展示访问地址 · 也可在项目页停止</span>
+          </div>
+        </div></div>
+      )}
+
       {/* 确认问答卡（FR-D4） */}
       {run?.state === "wait_confirm" && run.confirmQuestion && !run.confirmAnswer && (
         <div className="confirm-card"><div className="inner">
@@ -501,9 +526,23 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                   {selArtifacts.map((a) => (
                     <div key={a.id} className="art-row">
                       <span className="an">{a.name}</span>
-                      {a.storageKey && <span className="view" onClick={() => viewArtifact(a)}>查看</span>}
+                      {a.kind === "service" && <a className="view" style={{ color: "var(--acc)" }} href={String(a.meta?.url ?? "#")} target="_blank" rel="noreferrer">打开</a>}
+                      {a.storageKey && a.kind !== "service" && <span className="view" onClick={() => viewArtifact(a)}>查看</span>}
                     </div>
                   ))}
+                  {/* 文件清单（v2β）：本次任务变更/产出的全部文件 */}
+                  {(() => {
+                    const manifest = [...new Set((data?.artifacts ?? []).flatMap((a) => (a.meta?.files as string[] | undefined) ?? []))];
+                    if (manifest.length === 0) return null;
+                    return (
+                      <>
+                        <div className="sg-h" style={{ marginTop: 14 }}>文件清单 <span className="n">×{manifest.length}</span></div>
+                        {manifest.map((f) => (
+                          <div key={f} className="art-row"><span className="an mono">{f}</span></div>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div>
                   <div className="sg-h">验收标准 <span className="n">已达成 {doneCount}/{data?.criteria.length ?? 0}</span></div>

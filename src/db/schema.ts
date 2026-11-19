@@ -397,3 +397,23 @@ export const runMessages = pgTable(
   },
   (t) => [index("run_messages_run_idx").on(t.runId)],
 );
+
+/* ============ 服务端点（任务产出：启动的服务地址，v2β） ============ */
+
+/** status: running | stopped（服务在任务交付时启动，项目页展示访问地址） */
+export const serviceEndpoints = pgTable(
+  "service_endpoints",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id").notNull(),
+    runId: uuid("run_id").notNull(),
+    name: text("name").notNull(),
+    url: text("url").notNull(),
+    port: integer("port").notNull(),
+    pid: integer("pid"),
+    status: text("status").notNull().default("running"),
+    logPath: text("log_path"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("service_endpoints_project_idx").on(t.projectId)],
+);

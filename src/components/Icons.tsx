@@ -32,6 +32,7 @@ export function IconDefs() {
         <symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.8" /><path d="M5 5.5v6.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V5.5" /><path d="M5 12v6.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V12" /></symbol>
         <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 3L5.5 13.5H11L10 21l7.5-10.5H12L13 3z" /></symbol>
         <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5.5" y="11" width="13" height="9" rx="2.5" /><path d="M8.5 11V8.5a3.5 3.5 0 0 1 7 0V11" /></symbol>
+        <symbol id="i-up-r" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M9.5 7H17v7.5" /></symbol>
       </defs>
     </svg>
   );

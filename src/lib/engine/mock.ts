@@ -34,6 +34,11 @@ async function readArtifact(runId: string, name: string): Promise<string | null>
   }
 }
 
+/** 服务类需求：交付阶段真实启动 HTTP 服务并登记访问地址（v2β 产物） */
+export function isServiceRequirement(title: string): boolean {
+  return /启动|运行|服务|端口|端点|server|service|http/i.test(title);
+}
+
 export function needsSelection(title: string): boolean {
   return /数据库|存储|选型/.test(title);
 }
@@ -147,7 +152,7 @@ export class MockEngine implements ExecutionEngine {
     const srcPath = path.join(workPath(ctx.projectId), "src", `${slug}.mjs`);
     const moduleName = slug.replace(/-/g, "_");
 
-    const impl = [
+    const implLines = [
       `// ${ctx.requirement.title}`,
       ctx.confirmAnswer ? `// 技术选型（用户确认）：${ctx.confirmAnswer}` : "",
       ctx.repairRound > 0 ? `// 回溯修复第 ${ctx.repairRound} 轮：补充校验逻辑` : "",
@@ -159,8 +164,26 @@ export class MockEngine implements ExecutionEngine {
       `export default solve;`,
       ...ctx.userMessages.map((m) => `// 用户补充说明（FR-E6）：${m.slice(0, 80)}`),
     ]
-      .filter(Boolean)
-      .join("\n");
+      .filter(Boolean);
+
+    // 服务类需求（v2β）：附加可独立启动的 HTTP server（node src/<slug>.mjs 直接运行时监听 PORT）
+    if (isServiceRequirement(ctx.requirement.title)) {
+      implLines.push(
+        ``,
+        `// —— 服务入口（node src/${slug}.mjs 启动，PORT 环境变量指定端口）——`,
+        `import http from "node:http";`,
+        `import { pathToFileURL } from "node:url";`,
+        `if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {`,
+        `  const port = Number(process.env.PORT || ${3930 + ctx.requirement.seq});`,
+        `  http.createServer((req, res) => {`,
+        `    res.setHeader("content-type", "application/json; charset=utf-8");`,
+        `    res.end(JSON.stringify({ service: "${moduleName}", status: "ok", requirement: ${ctx.requirement.seq}, path: req.url, time: new Date().toISOString() }));`,
+        `  }).listen(port, () => console.log("service listening on " + port));`,
+        `}`,
+      );
+    }
+
+    const impl = implLines.join("\n");
 
     await fs.mkdir(path.dirname(srcPath), { recursive: true });
     await fs.writeFile(srcPath, impl);
@@ -306,8 +329,30 @@ export class MockEngine implements ExecutionEngine {
       .join("\n");
     const planEcho = await readArtifact(ctx.runId, "实现计划.md");
 
+    // 服务类需求（v2β）：交付阶段真实启动服务，访问地址作为任务产出
+    let services: StageOutput["services"];
+    let serviceSummary = "";
+    if (isServiceRequirement(ctx.requirement.title)) {
+      try {
+        const { startService } = await import("@/lib/services");
+        const slug = `${slugify(ctx.requirement.title)}-${ctx.requirement.seq}`;
+        const scriptPath = path.join(workPath(ctx.projectId), "src", `${slug}.mjs`);
+        const started = await startService({
+          projectId: ctx.projectId,
+          runId: ctx.runId,
+          name: ctx.requirement.title.slice(0, 30),
+          scriptPath,
+          preferredPort: 3930 + ctx.requirement.seq,
+        });
+        services = [{ ...started }];
+        serviceSummary = ` · 服务已启动 ${started.url}`;
+      } catch (err) {
+        serviceSummary = ` · 服务启动失败：${String(err).slice(0, 80)}`;
+      }
+    }
+
     return {
-      summary: `PR #${ctx.nextPrNumber} 已开出（${ctx.branch} → ${ctx.baseBranch}），记忆提案 2 条待确认`,
+      summary: `PR #${ctx.nextPrNumber} 已开出（${ctx.branch} → ${ctx.baseBranch}），记忆提案 2 条待确认${serviceSummary}`,
       artifacts: [
         { name: `PR #${ctx.nextPrNumber}`, kind: "pr", meta: { body: prBody } },
         ...(planEcho ? [{ name: "实现计划.md", kind: "plan" as const }] : []),
@@ -316,6 +361,7 @@ export class MockEngine implements ExecutionEngine {
         { type: "decision" as const, content: `「${ctx.requirement.title}」的实现方案：${ctx.confirmAnswer ?? "沿用项目既有模式，模块化单文件实现 + node:test 覆盖"}` },
         { type: "convention" as const, content: `新模块统一放在 src/<slug>.mjs，测试放 tests/<slug>.test.mjs，命名用需求 slug` },
       ],
+      ...(services ? { services } : {}),
       tokens: { in: 5100, out: 900 },
     };
   }

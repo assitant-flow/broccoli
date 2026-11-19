@@ -13,7 +13,8 @@
     "verify:suspend": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-suspend.ts",
     "verify:github": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-github.ts",
     "verify:sandbox": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-sandbox.ts",
-    "verify:retrieval": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-retrieval.ts"
+    "verify:retrieval": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-retrieval.ts",
+    "verify:services": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-services.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.0",
