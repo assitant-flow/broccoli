@@ -16,7 +16,7 @@ import type { ExecutionEngine } from "./types";
 export async function getEngine(userId: string): Promise<ExecutionEngine> {
   if (env.engine === "claude") {
     // ① 用户接入设置（v2β /settings/ai：per-user baseUrl/model/token）
-    const { loadUserAiSettings } = await import("@/app/api/settings/ai/route");
+    const { loadUserAiSettings } = await import("@/lib/ai-settings");
     const userAi = await loadUserAiSettings(userId);
     if (userAi) return new ClaudeEngine(userAi);
     // ② 平台级 env token

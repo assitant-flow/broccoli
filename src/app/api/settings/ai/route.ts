@@ -5,6 +5,7 @@ import { getSessionUser, unauthorized } from "@/lib/auth";
 import { ok, bad } from "@/lib/api";
 import { encryptSecret, maskSecret } from "@/lib/crypto";
 import { env } from "@/lib/env";
+import { getUserAiSettingsRaw, saveUserAiSettings } from "@/lib/ai-settings";
 
 /**
  * AI 接入设置（v2β）：per-user 存储 Anthropic 兼容端点 / 模型 / Token。
@@ -14,10 +15,7 @@ import { env } from "@/lib/env";
 
 type AiSettings = { baseUrl?: string; model?: string; tokenCipher?: string; tokenNonce?: string; tokenHint?: string };
 
-async function load(userId: string): Promise<AiSettings | null> {
-  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, `ai:${userId}`)).limit(1);
-  return (row?.value as AiSettings) ?? null;
-}
+const load = (userId: string) => getUserAiSettingsRaw(userId);
 
 export async function GET() {
   const user = await getSessionUser();
@@ -55,24 +53,7 @@ export async function PUT(req: Request) {
     next.tokenNonce = nonce;
     next.tokenHint = maskSecret(body.token.trim());
   }
-  const [existing] = await db.select().from(appSettings).where(eq(appSettings.key, `ai:${user.id}`)).limit(1);
-  if (existing) {
-    await db.update(appSettings).set({ value: next as Record<string, unknown> }).where(eq(appSettings.key, `ai:${user.id}`));
-  } else {
-    await db.insert(appSettings).values({ key: `ai:${user.id}`, value: next as Record<string, unknown> });
-  }
+  await saveUserAiSettings(user.id, next);
   void bad;
   return ok({ saved: true, baseUrl: next.baseUrl, model: next.model, tokenHint: next.tokenHint ?? null });
-}
-
-/** 供引擎读取（宿主/容器同进程）：解密后的用户 AI 设置 */
-export async function loadUserAiSettings(userId: string): Promise<{ key: string; baseUrl?: string; model?: string } | null> {
-  const saved = await load(userId);
-  if (!saved?.tokenCipher) return null;
-  try {
-    const { decryptSecret } = await import("@/lib/crypto");
-    return { key: decryptSecret(saved.tokenCipher), baseUrl: saved.baseUrl, model: saved.model };
-  } catch {
-    return null;
-  }
 }

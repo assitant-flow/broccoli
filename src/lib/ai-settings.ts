@@ -1,0 +1,38 @@
+import { db } from "@/db";
+import { appSettings } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { decryptSecret } from "@/lib/crypto";
+
+/**
+ * 用户 AI 接入设置读取（v2β）：存储于 app_settings key=`ai:${userId}`，
+ * token AES-256-GCM 加密。供引擎与设置页共用。
+ */
+export type UserAiSettings = { key: string; baseUrl?: string; model?: string };
+
+async function loadRaw(userId: string): Promise<{ baseUrl?: string; model?: string; tokenCipher?: string; tokenNonce?: string; tokenHint?: string } | null> {
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, `ai:${userId}`)).limit(1);
+  return (row?.value as never) ?? null;
+}
+
+export async function loadUserAiSettings(userId: string): Promise<UserAiSettings | null> {
+  const saved = await loadRaw(userId);
+  if (!saved?.tokenCipher) return null;
+  try {
+    return { key: decryptSecret(saved.tokenCipher), baseUrl: saved.baseUrl, model: saved.model };
+  } catch {
+    return null;
+  }
+}
+
+export async function saveUserAiSettings(userId: string, next: { baseUrl?: string; model?: string; tokenCipher?: string; tokenNonce?: string; tokenHint?: string }): Promise<void> {
+  const [existing] = await db.select().from(appSettings).where(eq(appSettings.key, `ai:${userId}`)).limit(1);
+  if (existing) {
+    await db.update(appSettings).set({ value: next as Record<string, unknown> }).where(eq(appSettings.key, `ai:${userId}`));
+  } else {
+    await db.insert(appSettings).values({ key: `ai:${userId}`, value: next as Record<string, unknown> });
+  }
+}
+
+export async function getUserAiSettingsRaw(userId: string) {
+  return loadRaw(userId);
+}
