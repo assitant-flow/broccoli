@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Shell } from "@/components/Shell";
 import { I } from "@/components/Icons";
 import { api } from "@/lib/client";
+import { Pagination } from "@/components/Pagination";
 
 type Proposal = { id: string; type: string; content: string; status: string; sourceRunId: string | null; injectedCount: number };
 type Item = { id: string; type: string; content: string; status: string; version: number; createdAt: string; updatedAt: string };
@@ -21,6 +22,8 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
   const [busy, setBusy] = useState(false);
   const [prefs, setPrefs] = useState<{ id: string; content: string }[]>([]);
   const [prefDraft, setPrefDraft] = useState("");
+  const [memPage, setMemPage] = useState(1);
+  const MEM_PAGE_SIZE = 6;
   const [mode, setMode] = useState<"full" | "retrieval">("full");
 
   useEffect(() => {
@@ -109,6 +112,9 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
   const pending = proposals.filter((p) => p.status === "pending");
   const confirmed = items.filter((i) => i.status === "confirmed");
   const disabled = items.filter((i) => i.status === "disabled");
+  const confirmedTotalPages = Math.max(1, Math.ceil(confirmed.length / MEM_PAGE_SIZE));
+  const safeMemPage = Math.min(memPage, confirmedTotalPages);
+  const confirmedPageItems = confirmed.slice((safeMemPage - 1) * MEM_PAGE_SIZE, safeMemPage * MEM_PAGE_SIZE);
 
   return (
     <Shell active="memories">
@@ -180,7 +186,7 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
 
       <div className="sec-hd"><span className="t">已确认记忆</span><span className="chip chip-gray">{confirmed.length} 条 · 全量注入每个任务</span></div>
       <div className="mem-rows">
-        {confirmed.map((m) => (
+        {confirmedPageItems.map((m) => (
           <div key={m.id} className="mem-row">
             <span className={`chip ${TYPE_CLS[m.type] ?? "chip-gray"}`}>{TYPE_LABEL[m.type] ?? m.type}</span>
             <div className="body">
@@ -205,6 +211,10 @@ export default function MemoriesPage({ params }: { params: Promise<{ id: string 
           </div>
         ))}
       </div>
+
+      {confirmed.length > MEM_PAGE_SIZE && (
+        <Pagination page={safeMemPage} pageSize={MEM_PAGE_SIZE} total={confirmed.length} onPageChange={setMemPage} />
+      )}
 
       {trace && (
         <div className="shell"><div className="core" style={{ padding: 9 }}><div className="trace">

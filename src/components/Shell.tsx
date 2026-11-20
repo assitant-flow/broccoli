@@ -48,7 +48,7 @@ export function Shell({ active, children }: { active: "dashboard" | "projects" |
           </div>
           <Link className={`nav-item ${active === "dashboard" ? "on" : ""}`} href="/"><I name="i-grid" size={17} />仪表盘</Link>
           <Link className={`nav-item ${active === "projects" ? "on" : ""}`} href="/projects"><I name="i-folder" size={17} />项目<span className="cnt">{projectCount}</span></Link>
-          <span className="nav-item" style={{ opacity: 0.5, cursor: "default" }}><I name="i-spark" size={17} />记忆库<span className="cnt">按项目</span></span>
+          <Link className={`nav-item ${active === "memories" ? "on" : ""}`} href="/memories"><I name="i-spark" size={17} />记忆库{notifCount >= 0 ? "" : ""}</Link>
           <Link className={`nav-item ${active === "usage" ? "on" : ""}`} href="/usage"><I name="i-gauge" size={17} />用量与成本</Link>
           <Link className={`nav-item ${active === "settings" ? "on" : ""}`} href="/settings/ai"><I name="i-key" size={17} />接入设置</Link>
           <Link className={`nav-item ${active === "notifications" ? "on" : ""}`} href="/notifications">

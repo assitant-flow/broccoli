@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Shell } from "@/components/Shell";
 import { I } from "@/components/Icons";
 import { api } from "@/lib/client";
+import { Pagination } from "@/components/Pagination";
 
 type Notif = { id: string; type: string; runId: string | null; createdAt: string; reqTitle: string | null; reqSeq: number | null; projectName: string | null };
 
@@ -18,6 +19,8 @@ const TYPE_META: Record<string, { cls: string; label: string }> = {
 export default function NotificationsPage() {
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   useEffect(() => {
     const load = () => api<Notif[]>("/api/notifications").then(setNotifs).catch(() => {});
@@ -27,6 +30,9 @@ export default function NotificationsPage() {
   }, []);
 
   const filtered = filter === "all" ? notifs : notifs.filter((n) => n.type === filter);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const counts = {
     all: notifs.length,
     wait_confirm: notifs.filter((n) => n.type === "wait_confirm").length,
@@ -40,7 +46,7 @@ export default function NotificationsPage() {
         <div><div className="hi">站内通知</div><div className="dt">任务状态变化实时汇入 · 与关键邮件同源去重（FR-E5）</div></div>
         <div className="sp" />
         <div className="seg">
-          <span className={filter === "all" ? "on" : ""} onClick={() => setFilter("all")}>全部 {counts.all}</span>
+          <span className={filter === "all" ? "on" : ""} onClick={() => { setFilter("all"); setPage(1); }}>全部 {counts.all}</span>
           <span className={filter === "wait_confirm" ? "on" : ""} onClick={() => setFilter("wait_confirm")}>等待确认 {counts.wait_confirm}</span>
           <span className={filter === "failed" ? "on" : ""} onClick={() => setFilter("failed")}>失败 {counts.failed}</span>
           <span className={filter === "completed" ? "on" : ""} onClick={() => setFilter("completed")}>完成 {counts.completed}</span>
@@ -54,7 +60,7 @@ export default function NotificationsPage() {
               暂无通知 —— 任务进入「等待确认」「失败」「完成」时会在这里出现，同时发送邮件提醒
             </div>
           )}
-          {filtered.map((n) => {
+          {pageItems.map((n) => {
             const meta = TYPE_META[n.type] ?? TYPE_META.completed;
             return (
               <div key={n.id} className="tl-row" style={{ padding: "14px 0" }}>
@@ -68,6 +74,8 @@ export default function NotificationsPage() {
               </div>
             );
           })}
+
+          <Pagination page={safePage} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={(p2) => setPage(p2)} />
         </div></div></div>
       </div>
     </Shell>
