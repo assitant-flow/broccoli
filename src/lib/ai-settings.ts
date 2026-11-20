@@ -36,3 +36,15 @@ export async function saveUserAiSettings(userId: string, next: { baseUrl?: strin
 export async function getUserAiSettingsRaw(userId: string) {
   return loadRaw(userId);
 }
+
+/** 解密用户 AI Token（无则 null）——连通性测试与引擎共用 */
+export async function getUserAiToken(userId: string): Promise<string | null> {
+  const saved = await loadRaw(userId);
+  if (!saved?.tokenCipher) return null;
+  try {
+    const key = decryptSecret(saved.tokenCipher).trim();
+    return key || null;
+  } catch {
+    return null;
+  }
+}
