@@ -20,6 +20,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Type check
         run: pnpm exec tsc --noEmit
+      - name: Unit tests（核心域层）
+        run: pnpm test:unit
 
   e2e:
     runs-on: ubuntu-latest

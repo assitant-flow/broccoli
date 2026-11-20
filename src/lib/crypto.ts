@@ -61,7 +61,11 @@ export function verifySession<T = { uid: string; exp: number }>(token: string | 
   const [data, sig] = token.split(".");
   if (!data || !sig) return null;
   const expected = crypto.createHmac("sha256", env.sessionSecret).update(data).digest("base64url");
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  // 畸形签名长度不同会导致 timingSafeEqual 抛异常 —— 长度守卫后再比较
+  const sigBuf = Buffer.from(sig, "base64url");
+  const expectedBuf = Buffer.from(expected, "base64url");
+  if (sigBuf.length !== expectedBuf.length) return null;
+  if (!crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
   try {
     const payload = JSON.parse(Buffer.from(data, "base64url").toString());
     if (typeof payload.exp !== "number" || payload.exp < Date.now()) return null;
