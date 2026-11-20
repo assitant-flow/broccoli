@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { normalizeBaseUrl } from "@/lib/ai-settings";
 import {
   type ExecutionEngine,
   type StageContext,
@@ -89,7 +90,11 @@ export class ClaudeEngine implements ExecutionEngine {
   readonly name = "claude" as const;
   private mock = new MockEngine();
 
-  constructor(private cfg: { key: string; baseUrl?: string; model?: string }) {}
+  constructor(cfg: { key: string; baseUrl?: string; model?: string }) {
+    this.cfg = { ...cfg, baseUrl: normalizeBaseUrl(cfg.baseUrl ?? env.anthropicBaseUrl) };
+  }
+
+  private cfg: { key: string; baseUrl: string; model?: string };
 
   private modelFor(_stage: StageContext["stageType"]): string {
     if (this.cfg.model) return this.cfg.model; // 用户接入设置覆盖（v2β）

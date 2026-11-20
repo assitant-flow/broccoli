@@ -5,7 +5,7 @@ import { getSessionUser, unauthorized } from "@/lib/auth";
 import { ok, bad } from "@/lib/api";
 import { decryptSecret } from "@/lib/crypto";
 import { env } from "@/lib/env";
-import { getUserAiToken } from "@/lib/ai-settings";
+import { getUserAiToken, normalizeBaseUrl } from "@/lib/ai-settings";
 
 /** 连通性测试（AC-A2）：anthropic → GET /v1/models；github → GET /user */
 export async function POST(req: Request) {
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     if (provider === "anthropic") {
       // Anthropic 兼容端点（支持本地 router/代理）：以最小 messages 调用探测连通性
       // baseUrl/model 取请求参数（接入设置页传入）→ 平台 env 兜底
-      const endpoint = (baseUrl ?? env.anthropicBaseUrl ?? "https://api.anthropic.com").replace(/\/$/, "");
+      const endpoint = normalizeBaseUrl((baseUrl ?? env.anthropicBaseUrl ?? "https://api.anthropic.com").replace(/\/$/, ""));
       const useModel = model || env.anthropicModel || "claude-haiku-4-5";
       const res = await fetch(`${endpoint}/v1/messages`, {
         method: "POST",

@@ -48,3 +48,16 @@ export async function getUserAiToken(userId: string): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * baseUrl 容器化规范化：应用跑在容器内时，宿主回环地址（127.0.0.1/localhost）
+ * 指向容器自身而非宿主 —— 自动重写为 host.docker.internal（host-gateway）。
+ * 宿主/本地模式原样返回。
+ */
+export function normalizeBaseUrl(url: string): string {
+  if (!url) return url;
+  if (!existsSync("/.dockerenv")) return url;
+  return url.replace(/^(https?:\/\/)(127\.0\.0\.1|localhost)(?=[/:]|$)/, "$1host.docker.internal");
+}
+
+import { existsSync } from "node:fs";
