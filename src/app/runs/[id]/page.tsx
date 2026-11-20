@@ -192,6 +192,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   const dragRef = useRef<{ key: string; sx: number; sy: number; ox: number; oy: number; moved?: boolean } | null>(null);
   const canvasWrapRef = useRef<HTMLDivElement | null>(null);
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
   const suppressClickRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -220,11 +221,11 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
     const dy = e.clientY - d.sy;
     if (!d.moved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) d.moved = true;
     // 边界跟随画布实际宽高（大屏可一直拖到右缘；容器可滚动区域之外不允许）
-    const cw = canvasWrapRef.current?.clientWidth ?? 1110;
-    const ch = canvasWrapRef.current?.clientHeight ?? 620;
+    const logicalW = Math.max(1110, (canvasWrapRef.current?.clientWidth ?? 1110) / zoom);
+    const logicalH = Math.max(620, (canvasWrapRef.current?.clientHeight ?? 620) / zoom);
     const w = DEFAULT_LAYOUT[d.key]?.w ?? 250;
-    const x = Math.max(0, Math.min(cw - w - 6, d.ox + dx));
-    const y = Math.max(0, Math.min(ch - 64, d.oy + dy));
+    const x = Math.max(0, Math.min(logicalW - w - 6, d.ox + dx / zoom));
+    const y = Math.max(0, Math.min(logicalH - 64, d.oy + dy / zoom));
     setPos((p) => ({ ...p, [d.key]: { x, y } }));
   }
   function onNodePointerUp(e: React.PointerEvent) {
@@ -237,6 +238,14 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
     suppressClickRef.current = d.moved ? d.key : null;
     setPos((p) => { persistPos(p); return p; });
   }
+  function zoomStep(delta: number) {
+    setZoom((z) => Math.round(Math.min(1.5, Math.max(0.5, z + delta)) * 10) / 10);
+  }
+  function zoomFit() {
+    const cw = canvasWrapRef.current?.clientWidth ?? 1110;
+    setZoom(Math.min(1, Math.round((cw / 1110) * 10) / 10));
+  }
+
   function resetLayout() {
     setPos(DEFAULT_LAYOUT);
     persistPos(DEFAULT_LAYOUT);
@@ -454,10 +463,16 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
               <span><i className="lq" />排队中</span>
             </span>
             <span className="sp" />
+            <div className="zoom">
+              <button className="zc" title="缩小" onClick={() => zoomStep(-0.1)}>−</button>
+              <span>{Math.round(zoom * 100)}%</span>
+              <button className="zc" title="放大" onClick={() => zoomStep(0.1)}>+</button>
+              <button className="zc" style={{ borderLeft: "1px solid var(--line)", borderRadius: 0 }} title="缩放至适配画布宽度" onClick={zoomFit}>适配</button>
+            </div>
             <button className="btn btn-ghost btn-sm" onClick={resetLayout} title="恢复默认画布布局">重置布局</button>
             <Link className="btn btn-ghost btn-sm" href={`/projects/${data?.project?.id}`}><I name="i-sliders" size={13} />阶段与模型配置</Link>
           </div>
-          <div className="shell"><div className="canvas-wrap"><div className="canvas-inner" ref={canvasWrapRef}>
+          <div className="shell"><div className="canvas-wrap"><div style={{ width: `calc(1110px * ${zoom})`, height: `calc(620px * ${zoom})` }}><div className="canvas-inner" ref={canvasWrapRef} style={{ transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
             <svg className="edges" width="100%" height="620">
               {edges.map((e, i) => <path key={i} className={e.c} d={e.d} />)}
             </svg>
@@ -510,7 +525,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                 <div className="sub">push 分支 + 堆叠 PR + 记忆提案</div>
               </div>
             </div>
-          </div></div></div>
+          </div></div></div></div>
 
           {/* 选中阶段检查器（FR-D16） */}
           {selStage && (
