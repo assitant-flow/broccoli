@@ -1,53 +1,41 @@
 /**
  * 单元测试：阶段模型路由（src/lib/engine/claude.ts pickStageModel）
- * 语义：阶段显式配置（override/custom）> 账号接入默认 > 平台 env > 内置推荐
+ * 语义：阶段显式配置（override/custom）> 平台默认模型；不再内置任何厂商模型名。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pickStageModel } from "../../src/lib/engine/claude";
 
 test("阶段显式配置优先：批次覆盖 override 生效", () => {
-  assert.equal(
-    pickStageModel("glm:glm-5.3-flash", "override", "glm:glm-5.3[1m]", undefined, "dev"),
-    "glm:glm-5.3-flash",
-  );
+  assert.equal(pickStageModel("model-a", "override", "model-default"), "model-a");
 });
 
 test("阶段显式配置优先：项目自定义 custom 生效", () => {
-  assert.equal(
-    pickStageModel("ds:deepseek-v4-pro", "custom", undefined, "glm:glm-5.3[1m]", "planning"),
-    "ds:deepseek-v4-pro",
-  );
+  assert.equal(pickStageModel("model-b", "custom", "model-default"), "model-b");
 });
 
-test("阶段为推荐时：账号接入默认生效", () => {
-  assert.equal(
-    pickStageModel("claude-sonnet-4-5", "recommended", "glm:glm-5.3[1m]", undefined, "dev"),
-    "glm:glm-5.3[1m]",
-  );
+test("未显式配置：用平台默认模型", () => {
+  assert.equal(pickStageModel("", "recommended", "model-default"), "model-default");
+  assert.equal(pickStageModel(null, null, "model-default"), "model-default");
 });
 
-test("账号默认留空：平台 env 生效", () => {
-  assert.equal(pickStageModel("claude-opus-4-6", "recommended", "", "glm:glm-5.3[1m]", "planning"), "glm:glm-5.3[1m]");
+test("平台未配置模型：返回空串（由引擎提示去设置页配置，而不是回落到某个内置模型）", () => {
+  assert.equal(pickStageModel("", "recommended", ""), "");
+  assert.equal(pickStageModel(undefined, undefined, undefined), "");
+  assert.equal(pickStageModel("  ", "recommended", "  "), "");
 });
 
-test("全部留空：内置 claude-* 推荐映射", () => {
-  assert.equal(pickStageModel(null, null, undefined, undefined, "planning"), "claude-opus-4-6");
-  assert.equal(pickStageModel(null, null, undefined, undefined, "test_run"), "claude-haiku-4-5");
-  assert.equal(pickStageModel(undefined, undefined, undefined, undefined, "unknown"), "claude-sonnet-4-5");
-});
-
-test("每阶段可各不相同（多模型并存的典型配置）", () => {
+test("每阶段可各不相同（平台模型列表内的多模型并存）", () => {
   const cfg: Record<string, { key: string; source: string }> = {
-    planning: { key: "glm:glm-5.3[1m]", source: "custom" },
-    dev: { key: "glm:glm-5.3-flash", source: "custom" },
-    test_run: { key: "ds:deepseek-flash", source: "custom" },
+    planning: { key: "model-strong", source: "custom" },
+    dev: { key: "model-fast", source: "custom" },
+    test_run: { key: "model-cheap", source: "custom" },
   };
-  const pick = (stage: string) => pickStageModel(cfg[stage]?.key, cfg[stage]?.source, undefined, undefined, stage);
-  assert.equal(pick("planning"), "glm:glm-5.3[1m]");
-  assert.equal(pick("dev"), "glm:glm-5.3-flash");
-  assert.equal(pick("test_run"), "ds:deepseek-flash");
-  assert.equal(pick("acceptance"), "claude-sonnet-4-5", "未配置的阶段走内置推荐");
+  const pick = (stage: string) => pickStageModel(cfg[stage]?.key, cfg[stage]?.source, "model-default");
+  assert.equal(pick("planning"), "model-strong");
+  assert.equal(pick("dev"), "model-fast");
+  assert.equal(pick("test_run"), "model-cheap");
+  assert.equal(pick("acceptance"), "model-default", "未配置的阶段走平台默认");
 });
 
 export {};

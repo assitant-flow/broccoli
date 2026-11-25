@@ -5,19 +5,27 @@ import { getSessionUser, unauthorized } from "@/lib/auth";
 import { ok, bad } from "@/lib/api";
 import { decryptSecret } from "@/lib/crypto";
 import { env } from "@/lib/env";
-import { getUserAiToken, normalizeBaseUrl } from "@/lib/ai-settings";
+import { getPlatformAiRaw, normalizeBaseUrl } from "@/lib/ai-settings";
+import { chatOnce, type AiProtocol } from "@/lib/llm";
 
 /** 连通性测试（AC-A2）：anthropic → GET /v1/models；github → GET /user */
 export async function POST(req: Request) {
   const user = await getSessionUser();
   if (!user) return unauthorized();
-  const { provider, secret, baseUrl, model } = (await req.json()) as {
-    provider: string; secret?: string; baseUrl?: string; model?: string;
+  const { provider, secret, baseUrl, model, protocol } = (await req.json()) as {
+    provider: string; secret?: string; baseUrl?: string; model?: string; protocol?: AiProtocol;
   };
 
-  // Token 解析优先级：请求显式 secret → 用户接入设置（app_settings）→ 旧 credentials → 平台 env
+  // Token 解析优先级：请求显式 secret → 平台 AI 接入设置 → 旧 credentials → 平台 env
+  const platform = await getPlatformAiRaw();
   let key = secret?.trim() ?? "";
-  if (!key) key = (await getUserAiToken(user.id)) ?? "";
+  if (!key && platform?.tokenCipher) {
+    try {
+      key = decryptSecret(platform.tokenCipher).trim();
+    } catch {
+      key = "";
+    }
+  }
   if (!key && provider === "anthropic" && env.sharedCredentials) key = env.anthropicAuthToken ?? "";
   if (!key) {
     const [cred] = await db
@@ -33,31 +41,17 @@ export async function POST(req: Request) {
 
   try {
     if (provider === "anthropic") {
-      // Anthropic 兼容端点（支持本地 router/代理）：以最小 messages 调用探测连通性
-      // baseUrl/model 取请求参数（接入设置页传入）→ 平台 env 兜底
-      const endpoint = normalizeBaseUrl((baseUrl ?? env.anthropicBaseUrl ?? "https://api.anthropic.com").replace(/\/$/, ""));
-      const useModel = model || env.anthropicModel || "claude-haiku-4-5";
-      const res = await fetch(`${endpoint}/v1/messages`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": key,
-          authorization: `Bearer ${key}`,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: useModel,
-          max_tokens: 16,
-          messages: [{ role: "user", content: "ping" }],
-        }),
-        signal: AbortSignal.timeout(30000),
-      });
-      if (!res.ok) {
-        const detail = (await res.text()).slice(0, 160);
-        return ok({ ok: false, error: `HTTP ${res.status}: ${detail}` });
+      // 平台 AI 接入：按所选接口模式发一次最小请求探测连通性
+      const useProtocol: AiProtocol = protocol ?? platform?.protocol ?? "anthropic";
+      const endpoint = normalizeBaseUrl((baseUrl ?? platform?.baseUrl ?? env.anthropicBaseUrl ?? "https://api.anthropic.com").replace(/\/$/, ""));
+      const useModel = model || platform?.defaultModel || platform?.models?.[0] || env.anthropicModel || "";
+      if (!useModel) return bad("未配置模型：请先在平台 AI 接入中填写模型列表");
+      try {
+        const reply = await chatOnce({ baseUrl: endpoint, protocol: useProtocol, key }, useModel, "你是连通性探测助手。", [{ role: "user", content: "ping" }], 16);
+        return ok({ ok: true, models: [useModel], protocol: useProtocol, sample: reply.slice(0, 40) });
+      } catch (err) {
+        return ok({ ok: false, error: explainLlmError(err) });
       }
-      const data = (await res.json()) as { model?: string };
-      return ok({ ok: true, models: [data.model ?? useModel] });
     }
     if (provider === "github") {
       const res = await fetch("https://api.github.com/user", {
@@ -72,4 +66,15 @@ export async function POST(req: Request) {
   } catch (err) {
     return ok({ ok: false, error: String(err).slice(0, 200) });
   }
+}
+
+/** 把协议层错误翻译成可操作的诊断（避免直接把上游 JSON 甩给用户） */
+function explainLlmError(err: unknown): string {
+  const msg = String((err as Error).message ?? err);
+  const status = (err as { status?: number }).status ?? Number(msg.match(/HTTP (\d{3})/)?.[1] ?? 0);
+  if (status === 401 || status === 403) return `${msg.slice(0, 120)} —— 鉴权失败：检查 API Key（以及接口模式是否与该端点匹配）`;
+  if (status === 429) return `${msg.slice(0, 160)} —— 上游限流或配额用尽：检查账户额度，或稍后重试`;
+  if (status === 404) return `${msg.slice(0, 120)} —— 路径不存在：检查 Base URL 是否正确，以及接口模式（Anthropic /v1/messages vs OpenAI /v1/chat/completions）`;
+  if (status >= 500) return `${msg.slice(0, 120)} —— 上游服务异常：稍后重试或联系端点提供方`;
+  return msg.slice(0, 200);
 }

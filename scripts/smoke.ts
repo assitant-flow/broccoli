@@ -131,9 +131,16 @@ async function main() {
   check("选型符合用户决定（AC-D11）", canvas2.data.run.confirmAnswer?.includes("PostgreSQL") === true && canvas2.data.criteria.every((c) => c.status === "achieved"), `answer=${canvas2.data.run.confirmAnswer?.slice(0, 40)}`);
 
   // 7. 阶段模型配置（FR-D17）
-  const cfg = await http<{ stages: { stageType: string; modelKey: string; source: string }[] }>(`/api/projects/${projA.id}/stage-configs`, "GET");
-  check("分阶段模型配置 + 推荐（FR-D17）", cfg.data.stages.length === 6 && cfg.data.stages.every((s) => s.modelKey));
-  await http(`/api/projects/${projA.id}/stage-configs`, "PUT", { updates: [{ stageType: "dev", modelKey: "claude-opus-4-6" }] });
+  const cfg = await http<{ stages: { stageType: string; modelKey: string; source: string; recommendedKey: string }[] }>(`/api/projects/${projA.id}/stage-configs`, "GET");
+  // 模型不再内置：推荐位来自平台 AI 接入的默认模型；未配置平台模型时用占位名验证机制
+  const aiCfg = await http<{ models: string[]; defaultModel: string }>("/api/settings/ai", "GET");
+  const probeModel = aiCfg.data.models[0] ?? aiCfg.data.defaultModel ?? "smoke-probe-model";
+  check(
+    "分阶段模型配置 + 平台默认（FR-D17）",
+    cfg.data.stages.length === 6 && cfg.data.stages.every((s) => s.modelKey || s.recommendedKey),
+    `platformModels=${aiCfg.data.models.length} probe=${probeModel}`,
+  );
+  await http(`/api/projects/${projA.id}/stage-configs`, "PUT", { updates: [{ stageType: "dev", modelKey: probeModel }] });
   const cfg2 = await http<{ stages: { stageType: string; source: string }[] }>(`/api/projects/${projA.id}/stage-configs`, "GET");
   check("自定义模型生效（AC-D17）", cfg2.data.stages.find((s) => s.stageType === "dev")!.source === "custom");
   await http(`/api/projects/${projA.id}/stage-configs`, "POST");
@@ -233,7 +240,7 @@ async function main() {
   const cfgBefore = await http<{ stages: { stageType: string; source: string }[] }>(`/api/projects/${projA.id}/stage-configs`, "GET");
   const ov = await http<{ requirements: { id: string; seq: number; latestRunId: string | null }[] }>(`/api/projects/${projA.id}/requirements`, "POST", {
     items: ["新增 /api/version 端点返回当前版本号"],
-    stageModelOverrides: { dev: "claude-opus-4-6", test_run: "claude-opus-4-6" },
+    stageModelOverrides: { dev: probeModel, test_run: probeModel },
   });
   check("提交批次带阶段模型覆盖（FR-D18）", ov.status === 200);
   const ovDone = await waitFor("覆盖批次任务完成", async () => {
@@ -245,7 +252,7 @@ async function main() {
   const ovCanvas = await http<{ stages: { type: string; modelKey: string; modelSource: string }[] }>(`/api/runs/${ovRun}`, "GET");
   check(
     "覆盖仅对该批次生效（AC-D18）",
-    ovCanvas.data.stages.find((s) => s.type === "dev")!.modelSource === "override" && ovCanvas.data.stages.find((s) => s.type === "dev")!.modelKey === "claude-opus-4-6",
+    ovCanvas.data.stages.find((s) => s.type === "dev")!.modelSource === "override" && ovCanvas.data.stages.find((s) => s.type === "dev")!.modelKey === probeModel,
     `dev=${ovCanvas.data.stages.find((s) => s.type === "dev")!.modelKey}/${ovCanvas.data.stages.find((s) => s.type === "dev")!.modelSource}`,
   );
   const cfgAfter = await http<{ stages: { stageType: string; source: string }[] }>(`/api/projects/${projA.id}/stage-configs`, "GET");

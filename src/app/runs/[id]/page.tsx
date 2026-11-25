@@ -87,6 +87,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   const [busy, setBusy] = useState(false);
   const [artifactView, setArtifactView] = useState<{ name: string; content: string } | null>(null);
   const [modelSaving, setModelSaving] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -164,6 +165,14 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    const pid = data?.project?.id;
+    if (!pid) return;
+    api<{ availableModels: string[] }>(`/api/projects/${pid}/stage-configs`)
+      .then((d) => setAvailableModels(d.availableModels ?? []))
+      .catch(() => {});
+  }, [data?.project?.id]);
 
   async function changeStageModel(stageType: string, modelKey: string) {
     setModelSaving(true);
@@ -549,7 +558,8 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                         onChange={(e) => changeStageModel(selected, e.target.value)}
                         style={{ appearance: "none", outline: "none", cursor: "pointer", height: 28, borderRadius: 9, border: "1px solid var(--line-2)", background: "rgba(255,255,255,.05)", color: "var(--txt)", fontSize: 10.5, fontFamily: "var(--mono)", padding: "0 8px" }}
                       >
-                        {["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"].map((m) => <option key={m} value={m} style={{ background: "#0b0e0c" }}>{m}</option>)}
+                        <option value="" style={{ background: "#0b0e0c" }}>跟随平台默认</option>
+                        {availableModels.map((m) => <option key={m} value={m} style={{ background: "#0b0e0c" }}>{m}</option>)}
                       </select>
                       <span className="v" style={{ marginLeft: 4 }}>{selStage.modelSource === "override" ? "批次覆盖" : selStage.modelSource === "custom" ? "自定义" : selStage.modelSource === "default" ? "账号默认" : "推荐"}</span>
                     </div>

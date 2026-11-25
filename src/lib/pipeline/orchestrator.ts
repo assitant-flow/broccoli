@@ -235,8 +235,8 @@ export async function startQueuedRuns(): Promise<number> {
       const [batch] = await db.select().from(requirementBatches).where(eq(requirementBatches.id, requirement.batchId)).limit(1);
       batchOverrides = batch?.stageModelOverrides ?? {};
     }
-    const { loadUserAiSettings } = await import("@/lib/ai-settings");
-    const accountModel = (await loadUserAiSettings(project.userId))?.model ?? env.anthropicModel ?? "";
+    const { getPlatformAiRaw, resolveDefaultModel } = await import("@/lib/ai-settings");
+    const platformModel = resolveDefaultModel(await getPlatformAiRaw());
     await db.insert(taskStages).values(
       STAGE_TYPES.map((t, i) => {
         if (batchOverrides[t]) {
@@ -245,8 +245,8 @@ export async function startQueuedRuns(): Promise<number> {
         if (models[t].source === "custom") {
           return { runId: run.id, type: t, seq: i, state: "queued" as const, modelKey: models[t].key, modelSource: "custom" };
         }
-        return accountModel
-          ? { runId: run.id, type: t, seq: i, state: "queued" as const, modelKey: accountModel, modelSource: "default" }
+        return platformModel
+          ? { runId: run.id, type: t, seq: i, state: "queued" as const, modelKey: platformModel, modelSource: "default" }
           : { runId: run.id, type: t, seq: i, state: "queued" as const, modelKey: models[t].key, modelSource: "recommended" };
       }),
     );

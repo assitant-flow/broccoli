@@ -53,12 +53,4 @@ export const STAGE_LABELS: Record<StageType, string> = {
   delivery: "交付",
 };
 
-/** 平台推荐模型（静态映射，FR-D17） */
-export const RECOMMENDED_MODELS: Record<StageType, string> = {
-  planning: "claude-opus-4-6",
-  dev: "claude-sonnet-4-5",
-  test_design: "claude-sonnet-4-5",
-  test_run: "claude-haiku-4-5",
-  acceptance: "claude-sonnet-4-5",
-  delivery: "claude-haiku-4-5",
-};
+/* 模型不再内置：可用模型由「平台 AI 接入设置」的模型列表决定 */

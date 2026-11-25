@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
-import { normalizeBaseUrl } from "@/lib/ai-settings";
+import { normalizeBaseUrl, type AiProtocol } from "@/lib/ai-settings";
+import { chatOnce, LlmHttpError, type LlmTarget } from "@/lib/llm";
 import {
   type ExecutionEngine,
   type StageContext,
@@ -10,10 +11,10 @@ import {
 import { MockEngine, needsSelection } from "./mock";
 
 /**
- * ClaudeEngine：真实 LLM 集成（Anthropic Messages 兼容协议）。
- * - 端点：env.anthropicBaseUrl（官方 api.anthropic.com 或本地 router / 代理）
- * - 认证：x-api-key + Authorization Bearer 双头（兼容两种网关约定）
- * - 模型：env.anthropicModel 覆盖全部阶段；未设置则按阶段用 claude-* 配置
+ * LlmEngine：真实 LLM 集成（平台 AI 接入驱动）。
+ * - 端点 / 接口模式 / 模型列表 / 密钥全部来自「平台 AI 接入设置」
+ * - 协议：anthropic（Messages）| openai（Chat Completions），由设置页选择
+ * - 模型：阶段显式配置（批次覆盖 / 项目自定义）> 平台默认模型；平台模型列表由用户维护
  * 规划 / 验收判定由模型产出；文件与 git 操作沿用确定性落地模板（ExecutionTarget 抽象）。
  */
 
@@ -22,30 +23,14 @@ interface Msg {
   content: string;
 }
 
-async function callClaude(key: string, baseUrl: string, model: string, system: string, messages: Msg[], maxTokens = 4000): Promise<string> {
+async function callClaude(target: LlmTarget, model: string, system: string, messages: Msg[], maxTokens = 4000): Promise<string> {
   // 网络层重试（fetch failed / 超时等瞬时抖动重试 2 次；HTTP 业务错误不重试）
   let lastNetErr: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(`${baseUrl}/v1/messages`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": key,
-          authorization: `Bearer ${key}`,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({ model, max_tokens: maxTokens, system, messages }),
-        signal: AbortSignal.timeout(180000),
-      });
-      if (!res.ok) {
-        const detail = await res.text();
-        throw new StageFailure(`Anthropic API 调用失败（${res.status}）：${detail.slice(0, 300)}`);
-      }
-      const data = (await res.json()) as { content: { type: string; text?: string }[] };
-      return data.content.filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+      return await chatOnce(target, model, system, messages, maxTokens);
     } catch (err) {
-      if (err instanceof StageFailure) throw err; // HTTP 业务错误直接抛出
+      if (err instanceof LlmHttpError) throw new StageFailure(`LLM API 调用失败（${err.status}）：${err.detail}`);
       lastNetErr = err; // 网络抖动 → 重试
     }
   }
@@ -68,10 +53,10 @@ function extractJson<T>(text: string): T {
 }
 
 /** LLM JSON 调用（解析失败自动重试一次——应对偶发截断/格式抖动） */
-async function callClaudeJson<T>(key: string, baseUrl: string, model: string, system: string, user: string, maxTokens = 4000): Promise<T> {
+async function callClaudeJson<T>(target: LlmTarget, model: string, system: string, user: string, maxTokens = 4000): Promise<T> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await callClaude(key, baseUrl, model, system, [{ role: "user", content: attempt === 0 ? user : `${user}\n\n（上一次输出不是合法 JSON，请严格只输出 JSON，不要任何多余文字）` }], maxTokens);
+    const raw = await callClaude(target, model, system, [{ role: "user", content: attempt === 0 ? user : `${user}\n\n（上一次输出不是合法 JSON，请严格只输出 JSON，不要任何多余文字）` }], maxTokens);
     try {
       return extractJson<T>(raw);
     } catch (err) {
@@ -83,63 +68,50 @@ async function callClaudeJson<T>(key: string, baseUrl: string, model: string, sy
 
 /** 模型输出不合规（非网络/鉴权错误）时的降级判定：回退确定性模板逻辑，保证流水线韧性 */
 function isModelOutputError(err: unknown): boolean {
-  return err instanceof StageFailure && !err.message.includes("Anthropic API 调用失败");
+  return err instanceof StageFailure && !err.message.includes("LLM API 调用失败");
 }
 
 /**
- * 阶段模型选择（多模型路由，v2β）：
- * 1. 阶段显式配置（批次覆盖 override / 项目阶段配置 custom）优先——这就是「每个阶段用不同模型」
- * 2. 其余情况用账号接入默认（/settings/ai 的模型，留空则继续往下）
- * 3. 平台 env（ANTHROPIC_MODEL）
- * 4. 内置 claude-* 推荐映射
+ * 阶段模型选择（多模型路由）：
+ * 1. 阶段显式配置（批次覆盖 override / 项目阶段配置 custom）优先——让每个阶段用不同模型
+ * 2. 否则用平台默认模型（设置页「默认模型」> 模型列表首个）
+ * 3. 都没有返回空串，由引擎在调用前抛错（提示先在平台 AI 接入里配置模型）
+ * 不再内置任何厂商模型名：可选模型完全由平台设置里的模型列表决定。
  */
 export function pickStageModel(
   stageKey: string | null | undefined,
   stageSource: string | null | undefined,
-  accountModel: string | undefined,
-  envModel: string | undefined,
-  stage: string,
+  defaultModel: string | undefined,
 ): string {
   if (stageKey && (stageSource === "custom" || stageSource === "override")) return stageKey;
-  if (accountModel) return accountModel;
-  if (envModel) return envModel;
-  const map: Record<string, string> = {
-    planning: "claude-opus-4-6",
-    dev: "claude-sonnet-4-5",
-    test_design: "claude-sonnet-4-5",
-    test_run: "claude-haiku-4-5",
-    acceptance: "claude-sonnet-4-5",
-    delivery: "claude-haiku-4-5",
-  };
-  return map[stage] ?? "claude-sonnet-4-5";
+  return defaultModel?.trim() ?? "";
 }
 
 export class ClaudeEngine implements ExecutionEngine {
   readonly name = "claude" as const;
   private mock = new MockEngine();
 
-  constructor(cfg: { key: string; baseUrl?: string; model?: string }) {
-    this.cfg = { ...cfg, baseUrl: normalizeBaseUrl(cfg.baseUrl ?? env.anthropicBaseUrl) };
+  constructor(cfg: { key: string; baseUrl?: string; protocol?: AiProtocol; defaultModel?: string }) {
+    this.cfg = {
+      key: cfg.key,
+      baseUrl: normalizeBaseUrl(cfg.baseUrl ?? env.anthropicBaseUrl),
+      protocol: cfg.protocol === "openai" ? "openai" : "anthropic",
+      defaultModel: cfg.defaultModel?.trim() ?? "",
+    };
   }
 
-  private cfg: { key: string; baseUrl: string; model?: string };
+  private cfg: { key: string; baseUrl: string; protocol: AiProtocol; defaultModel: string };
 
-  private modelFor(_stage: StageContext["stageType"]): string {
-    if (this.cfg.model) return this.cfg.model; // 用户接入设置覆盖（v2β）
-    if (env.anthropicModel) return env.anthropicModel;
-    const map: Record<string, string> = {
-      planning: "claude-opus-4-6",
-      dev: "claude-sonnet-4-5",
-      test_design: "claude-sonnet-4-5",
-      test_run: "claude-haiku-4-5",
-      acceptance: "claude-sonnet-4-5",
-      delivery: "claude-haiku-4-5",
-    };
-    return map[_stage] ?? "claude-sonnet-4-5";
+  /** 当前 LLM 目标（协议 + 端点 + 密钥），供各阶段调用共用 */
+  private target(): LlmTarget {
+    return { baseUrl: this.cfg.baseUrl, protocol: this.cfg.protocol, key: this.cfg.key };
   }
 
   async runStage(ctx: StageContext): Promise<StageOutput> {
-    const model = pickStageModel(ctx.modelKey, ctx.modelSource, this.cfg.model, env.anthropicModel, ctx.stageType);
+    const model = pickStageModel(ctx.modelKey, ctx.modelSource, this.cfg.defaultModel);
+    if (!model) {
+      throw new StageFailure("未配置可用模型：请在「接入设置」填写模型列表（平台级），或为该阶段显式指定模型");
+    }
     const memoryBlock = ctx.injections.length ? ctx.injections.join("\n") : "（无前序记忆）";
 
     if (ctx.stageType === "planning" && needsSelection(ctx.requirement.title) && !ctx.confirmAnswer) {
@@ -151,8 +123,7 @@ export class ClaudeEngine implements ExecutionEngine {
       await sleep(200);
       try {
         const parsed = await callClaudeJson<{ summary: string; subtaskTitles: string[]; criteria: { content: string; verifyStage: string }[] }>(
-          this.cfg.key,
-          this.cfg.baseUrl ?? env.anthropicBaseUrl,
+          this.target(),
           model,
           "你是 Broccoli 平台的规划 agent。读取项目记忆与需求，将需求拆解为子任务并给出客观可核验的验收标准。严格只输出 JSON，不要输出任何其他文字。",
           `项目记忆与上下文：\n${memoryBlock}\n\n需求 #${ctx.requirement.seq}：${ctx.requirement.title}\n描述：${ctx.requirement.description}\n${ctx.confirmAnswer ? `用户已确认技术选型：${ctx.confirmAnswer}（计划与标准必须与该选型一致）\n` : ""}\n输出 JSON（schema 固定）：\n{"summary":"一句话计划摘要","subtaskTitles":["子任务1","子任务2","子任务3"],"criteria":[{"content":"可核验标准","verifyStage":"dev|test_run|delivery"}]}\n要求：criteria 恰好 4 条，verifyStage 按可验证性分配（实现一致性→dev、测试与校验→test_run、PR 描述与文档→delivery）。`,
@@ -256,8 +227,7 @@ export class ClaudeEngine implements ExecutionEngine {
       let summary = `验收对照完成：${updates.filter((u) => u.status === "achieved").length}/${ctx.criteria.length} 达成${updates.some((u) => u.status === "failed") ? "，存在待回溯修复项" : ""}`;
       try {
         const parsed = await callClaudeJson<{ summary: string }>(
-          this.cfg.key,
-          this.cfg.baseUrl ?? env.anthropicBaseUrl,
+          this.target(),
           model,
           "你是 Broccoli 平台的验收 agent。基于给定的判定结果写一句话总结。严格只输出 JSON。",
           `需求：${ctx.requirement.title}\n修复轮次：${ctx.repairRound}\n判定结果：\n${ctx.criteria.map((c) => `${c.seq}. [${c.verifyStage}] ${c.content} → ${updates.find((u) => u.seq === c.seq)?.status}`).join("\n")}\n\n输出 JSON：{"summary":"一句话验收结论（引用关键证据）"}`,

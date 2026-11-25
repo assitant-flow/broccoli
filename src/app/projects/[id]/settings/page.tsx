@@ -7,7 +7,7 @@ import { I } from "@/components/Icons";
 import { api } from "@/lib/client";
 
 type StageCfg = { stageType: string; modelKey: string; source: "recommended" | "custom"; recommendedKey: string };
-type Data = { stages: StageCfg[]; parallelStages: boolean };
+type Data = { stages: StageCfg[]; parallelStages: boolean; availableModels: string[]; defaultModel: string };
 
 const STAGE_META: Record<string, { name: string; en: string; desc: string; arts: string[]; icon: string }> = {
   planning: { name: "规划", en: "PLANNING", desc: "读取记忆与上下文，将需求拆解为具体子任务，生成实现计划、验收标准，并为后续阶段推荐模型。", arts: ["实现计划.md", "子任务 ×N", "验收标准 ×N"], icon: "i-spark" },
@@ -18,7 +18,7 @@ const STAGE_META: Record<string, { name: string; en: string; desc: string; arts:
   delivery: { name: "交付", en: "DELIVERY", desc: "推送分支、开出堆叠 PR（含变更说明），并触发生成记忆提案。", arts: ["PR", "记忆提案 ×N"], icon: "i-pr" },
 };
 
-const MODEL_CHOICES = ["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"];
+/* 可选模型来自平台 AI 接入设置的模型列表（不再内置厂商模型） */
 
 export default function StageConfigPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState("");
@@ -116,8 +116,9 @@ export default function StageConfigPage({ params }: { params: Promise<{ id: stri
         <div>
           {data?.stages.map((s) => {
             const meta = STAGE_META[s.stageType];
-            const current = dirty[s.stageType] ?? s.modelKey;
-            const isCustom = s.source === "custom" || (dirty[s.stageType] && dirty[s.stageType] !== s.recommendedKey);
+            // 空值 = 跟随平台默认模型（不再有内置推荐档位）
+            const current = dirty[s.stageType] ?? s.modelKey ?? "";
+            const isCustom = !!current;
             return (
               <div key={s.stageType} className="stage-card">
                 <span className="si"><I name={meta.icon} size={17} /></span>
@@ -133,12 +134,13 @@ export default function StageConfigPage({ params }: { params: Promise<{ id: stri
                     onChange={(e) => setDirty({ ...dirty, [s.stageType]: e.target.value })}
                     style={{ appearance: "none", outline: "none", cursor: "pointer" }}
                   >
-                    {MODEL_CHOICES.map((m) => <option key={m} value={m} style={{ background: "#0b0e0c" }}>{m}</option>)}
+                    <option value="" style={{ background: "#0b0e0c" }}>跟随平台默认{data.defaultModel ? `（${data.defaultModel}）` : ""}</option>
+                    {data.availableModels.map((m) => <option key={m} value={m} style={{ background: "#0b0e0c" }}>{m}{m === data.defaultModel ? "（默认）" : ""}</option>)}
                   </select>
-                  {isCustom && dirty[s.stageType] !== s.recommendedKey ? (
-                    <span className="chip chip-amber" style={{ height: 22, fontSize: 9.5 }}>自定义 · 原推荐 {s.recommendedKey.replace("claude-", "")}</span>
+                  {isCustom ? (
+                    <span className="chip chip-amber" style={{ height: 22, fontSize: 9.5 }}>自定义</span>
                   ) : (
-                    <span className="chip chip-green" style={{ height: 22, fontSize: 9.5 }}>推荐</span>
+                    <span className="chip chip-green" style={{ height: 22, fontSize: 9.5 }}>平台默认</span>
                   )}
                 </div>
               </div>

@@ -1,44 +1,84 @@
 import { db } from "@/db";
-import { appSettings } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users } from "@/db/schema";
+import { asc } from "drizzle-orm";
 import { getSessionUser, unauthorized } from "@/lib/auth";
 import { ok, bad } from "@/lib/api";
-import { encryptSecret, maskSecret } from "@/lib/crypto";
+import { decryptSecret, encryptSecret, maskSecret } from "@/lib/crypto";
 import { env } from "@/lib/env";
-import { getUserAiSettingsRaw, saveUserAiSettings } from "@/lib/ai-settings";
+import {
+  getPlatformAiRaw,
+  resolveDefaultModel,
+  savePlatformAiRaw,
+  type AiProtocol,
+} from "@/lib/ai-settings";
+import { listModels } from "@/lib/llm";
 
 /**
- * AI 接入设置（v2β）：per-user 存储 Anthropic 兼容端点 / 模型 / Token。
- * 存储：app_settings key=`ai:${userId}`（token AES-256-GCM 加密，界面只回显掩码）。
- * 引擎优先级：用户接入设置 > 平台 env > 用户 BYO key(旧) > Mock。
+ * 平台级 AI 接入设置（全平台共用）：
+ * Base URL / 接口模式 / 模型列表 / API Key。写操作仅限平台所有者（首个账号）。
+ * Token 只回显掩码；提交空 token 表示保持不变。
  */
 
-type AiSettings = { baseUrl?: string; model?: string; tokenCipher?: string; tokenNonce?: string; tokenHint?: string };
+async function requireOwner(): Promise<{ error: Response } | { ok: true }> {
+  const user = await getSessionUser();
+  if (!user) return { error: unauthorized() };
+  const [owner] = await db.select().from(users).orderBy(asc(users.createdAt)).limit(1);
+  if (owner && owner.id !== user.id) {
+    return { error: Response.json({ code: "FORBIDDEN", message: "只有平台所有者可以修改 AI 接入设置" }, { status: 403 }) };
+  }
+  return { ok: true };
+}
 
-const load = (userId: string) => getUserAiSettingsRaw(userId);
+function tokenFromCipher(cipher: string | undefined): string {
+  if (!cipher) return "";
+  try {
+    return decryptSecret(cipher).trim();
+  } catch {
+    return "";
+  }
+}
 
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return unauthorized();
-  const saved = await load(user.id);
+  const raw = await getPlatformAiRaw();
   return ok({
-    baseUrl: saved?.baseUrl ?? env.anthropicBaseUrl,
-    model: saved?.model ?? env.anthropicModel,
-    tokenHint: saved?.tokenHint ?? null,
-    hasToken: !!saved?.tokenCipher || (env.sharedCredentials && !!env.anthropicAuthToken),
+    baseUrl: raw?.baseUrl ?? env.anthropicBaseUrl,
+    protocol: (raw?.protocol ?? "anthropic") as AiProtocol,
+    models: raw?.models ?? [],
+    defaultModel: resolveDefaultModel(raw),
+    tokenHint: raw?.tokenHint ?? null,
+    hasToken: !!raw?.tokenCipher,
+    /** 未配置时是否可用平台 env 兜底 */
+    envFallback: !!env.anthropicAuthToken,
     engine: env.engine,
-    source: saved ? "user" : env.sharedCredentials && env.anthropicAuthToken ? "platform-env" : "credentials-or-mock",
   });
 }
 
 export async function PUT(req: Request) {
-  const user = await getSessionUser();
-  if (!user) return unauthorized();
-  const body = (await req.json()) as { baseUrl?: string; model?: string; token?: string; clearToken?: boolean };
-  const saved = await load(user.id);
-  const next: AiSettings = {
-    baseUrl: body.baseUrl?.trim() || saved?.baseUrl,
-    model: body.model?.trim() || saved?.model,
+  const gate = await requireOwner();
+  if ("error" in gate) return gate.error;
+
+  const body = (await req.json().catch(() => ({}))) as {
+    baseUrl?: string;
+    protocol?: AiProtocol;
+    models?: string[];
+    defaultModel?: string;
+    token?: string;
+    clearToken?: boolean;
+  };
+  const saved = await getPlatformAiRaw();
+  const models = (body.models ?? saved?.models ?? []).map((m) => m.trim()).filter(Boolean);
+  const defaultModel = (body.defaultModel ?? saved?.defaultModel ?? "").trim();
+  if (defaultModel && models.length > 0 && !models.includes(defaultModel)) {
+    return bad("默认模型必须在模型列表中");
+  }
+
+  const next: Parameters<typeof savePlatformAiRaw>[0] = {
+    baseUrl: body.baseUrl?.trim() || saved?.baseUrl || "",
+    protocol: body.protocol === "openai" ? "openai" : "anthropic",
+    models,
+    defaultModel,
     tokenCipher: saved?.tokenCipher,
     tokenNonce: saved?.tokenNonce,
     tokenHint: saved?.tokenHint,
@@ -53,7 +93,24 @@ export async function PUT(req: Request) {
     next.tokenNonce = nonce;
     next.tokenHint = maskSecret(body.token.trim());
   }
-  await saveUserAiSettings(user.id, next);
-  void bad;
-  return ok({ saved: true, baseUrl: next.baseUrl, model: next.model, tokenHint: next.tokenHint ?? null });
+  await savePlatformAiRaw(next);
+  return ok({ saved: true, baseUrl: next.baseUrl, protocol: next.protocol, models, defaultModel, tokenHint: next.tokenHint ?? null });
+}
+
+/** 从端点拉取模型列表（GET {baseUrl}/v1/models），用于一键填充 */
+export async function POST(req: Request) {
+  const gate = await requireOwner();
+  if ("error" in gate) return gate.error;
+  const body = (await req.json().catch(() => ({}))) as { baseUrl?: string; token?: string };
+  const saved = await getPlatformAiRaw();
+  const baseUrl = body.baseUrl?.trim() || saved?.baseUrl || env.anthropicBaseUrl;
+  const token = body.token?.trim() || tokenFromCipher(saved?.tokenCipher) || (env.sharedCredentials ? env.anthropicAuthToken : "");
+  if (!token) return bad("请先填写并保存 API Key，或本次输入密钥后再拉取");
+  try {
+    const models = await listModels(baseUrl, token);
+    if (models.length === 0) return bad("端点未返回任何模型");
+    return ok({ models });
+  } catch (err) {
+    return bad(`拉取模型失败：${String((err as Error).message).slice(0, 200)}`);
+  }
 }

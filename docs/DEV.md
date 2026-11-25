@@ -30,7 +30,7 @@ pnpm smoke
 
 **沙箱模式**：`.env` 配置 `BROCCOLI_SANDBOX=docker` 后，每队列一个非特权容器（只读根、tmpfs /tmp、512MB/1CPU/PIDs 128、cap-drop ALL、no-new-privileges；随队列复用、空闲/终态回收），容器挂 internal 网络、唯一出口为白名单 egress proxy（分阶段规则：prepare=依赖 registry，execute=Anthropic/GitHub 域；判定写审计日志）。专项验证：`pnpm verify:sandbox`（基建 8 项 + 集成 5 项，全部通过）。剩余风险：进程绕过 proxy env 的直连由 internal 网络收敛、v2 透明拦截（见 design §12）。
 
-**真实 LLM 模式**：`.env` 中 `BROCCOLI_ENGINE=claude` + `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_MODEL`（已验证：本地 AI router 代理 GLM）。规划与验收由真实模型产出；模型输出异常自动降级模板逻辑保证流水线韧性；验收采用机械护栏判定（校验类标准对照源码核验、行为类标准以测试证据支撑）防 LLM 判定波动。
+**真实 LLM 模式**：优先在应用内 **「接入设置」** 配置（平台级，全平台共用）——Base URL、接口模式（Anthropic Messages / OpenAI Chat Completions）、模型列表、API Key；模型由你维护的列表决定（不内置任何厂商模型名），项目阶段配置与批次覆盖只能从列表中选择。也可用 `.env` 兜底：`BROCCOLI_ENGINE=claude` + `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_MODEL`（共享凭证开启时生效）。规划与验收由真实模型产出；模型输出异常自动降级模板逻辑保证流水线韧性；验收采用机械护栏判定（校验类标准对照源码核验、行为类标准以测试证据支撑）防 LLM 判定波动。
 
 ## 演示数据覆盖的场景
 
@@ -55,7 +55,7 @@ pnpm smoke
 | Redis + BullMQ 队列 | 进程内调度器（DB 轮询 + 原子认领，§6 幂等设计） | 接 BullMQ worker |
 | 调度器独立进程 | `src/instrumentation.ts` 内启动（单例 + globalThis 守卫） | 拆独立进程 |
 | 沙箱容器（Docker） | 本地工作区（`.data/repos/<id>/work`）+ 真实进程 | 实现 `ContainerProvider` 第二实现 |
-| Anthropic 兼容 LLM（Claude/GLM 等） | `ExecutionEngine` 抽象：`MockEngine`（离线演示）+ `ClaudeEngine`（Messages 兼容协议，`ANTHROPIC_BASE_URL`/`ANTHROPIC_MODEL`/`ANTHROPIC_AUTH_TOKEN` 可指向官方或本地 router）。**已用 GLM（glm:glm-5.3）经本地 router 完成端到端验收（smoke 50/50 全绿）**；规划/验收由真实模型产出（JSON 容错重试 + 输出不合规自动降级模板），验收判定为机械护栏（校验类标准对照源码核验，触发 FR-D14 回溯） | 容器内换 Claude Code Agent SDK（permission 回调、session resume） |
+| LLM 接入（Anthropic / OpenAI 双协议） | `ExecutionEngine` 抽象：`MockEngine`（离线演示）+ `ClaudeEngine`（按平台接入设置分流：Anthropic Messages 或 OpenAI Chat Completions；Base URL / 模型列表 / 密钥均在「接入设置」维护，支持从 `/v1/models` 一键拉取）。**已用 GLM（glm:glm-5.3）经本地 router 完成端到端验收（smoke 50/50 全绿）**；规划/验收由真实模型产出（JSON 容错重试 + 输出不合规自动降级模板），验收判定为机械护栏（校验类标准对照源码核验，触发 FR-D14 回溯） | 容器内换 Claude Code Agent SDK（permission 回调、session resume） |
 | GitHub（真实集成） | `originKind=github`：真实 clone/push（extraheader 注入 token，HTTP/1.1 防挂起）+ REST 开 PR/合并/关闭/Issues 同步。**已用真实仓库 AlpherJang/broccoli-demo 完成 13/13 端到端验证（pnpm verify:github）**；OAuth 登录流程待用户注册 OAuth App，当前为 PAT 模式 | OAuth App 登录流程 |
 | 邮件（Resend/SMTP） | OutboxMailer 落盘 `.data/outbox/*.eml` | 换 Resend 适配器 |
 | GitHub Issues | 真实 REST 同步（github origin：拉取 open issues 镜像、PR 开出后真实关闭回写）；本地模式为模拟落库 | — |

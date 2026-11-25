@@ -43,6 +43,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [dragSeqId, setDragSeqId] = useState<string | null>(null);
   const [showModelOverride, setShowModelOverride] = useState(false);
   const [modelOverrides, setModelOverrides] = useState<Record<string, string>>({});
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const composeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,6 +52,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => {
     if (!id) return;
+    api<{ availableModels: string[] }>(`/api/projects/${id}/stage-configs`)
+      .then((d) => setAvailableModels(d.availableModels ?? []))
+      .catch(() => {});
     const load = () =>
       api<{ project: Project; requirements: Req[]; runs: Run[]; prs: Pr[] }>(`/api/projects/${id}`)
         .then((d) => {
@@ -256,7 +260,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                           style={{ flex: 1, height: 32, borderRadius: 10, border: "1px solid var(--line-2)", background: "rgba(255,255,255,.04)", color: "var(--txt)", fontSize: 11.5, fontFamily: "var(--mono)", outline: "none" }}
                         >
                           <option value="">跟随项目配置</option>
-                          {["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"].map((m) => <option key={m} value={m}>{m}</option>)}
+                          {availableModels.map((m) => <option key={m} value={m}>{m}</option>)}
                         </select>
                       </div>
                     ))}
