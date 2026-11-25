@@ -127,7 +127,7 @@ export default function AiSettingsPage() {
             <div>
               <p style={{ marginBottom: 10 }}>· 端点需兼容 <b>Anthropic Messages 协议</b>（`POST {"/v1/messages"}`）；本地 AI router / 各类网关均可。</p>
               <p style={{ marginBottom: 10 }}>· 模型名写 router 中的模型 ID（如 `glm:glm-5.3[1m]`）；使用官方端点时填 `claude-…`。</p>
-              <p style={{ marginBottom: 10 }}>· 分阶段模型（阶段与模型配置）在此未覆盖时按阶段路由；本页模型设置优先生效于全部阶段。</p>
+              <p style={{ marginBottom: 10 }}>· 本页「模型」是<b>账号级默认</b>：项目「阶段与模型配置」里显式自定义的模型优先于它（批次临时覆盖优先级最高）。</p>
               <p>· Token 留空保存 = 保持现有 Token 不变；需清除 Token 请清空后点保存两次并确认。</p>
             </div>
           </div>

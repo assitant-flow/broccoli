@@ -86,6 +86,34 @@ function isModelOutputError(err: unknown): boolean {
   return err instanceof StageFailure && !err.message.includes("Anthropic API 调用失败");
 }
 
+/**
+ * 阶段模型选择（多模型路由，v2β）：
+ * 1. 阶段显式配置（批次覆盖 override / 项目阶段配置 custom）优先——这就是「每个阶段用不同模型」
+ * 2. 其余情况用账号接入默认（/settings/ai 的模型，留空则继续往下）
+ * 3. 平台 env（ANTHROPIC_MODEL）
+ * 4. 内置 claude-* 推荐映射
+ */
+export function pickStageModel(
+  stageKey: string | null | undefined,
+  stageSource: string | null | undefined,
+  accountModel: string | undefined,
+  envModel: string | undefined,
+  stage: string,
+): string {
+  if (stageKey && (stageSource === "custom" || stageSource === "override")) return stageKey;
+  if (accountModel) return accountModel;
+  if (envModel) return envModel;
+  const map: Record<string, string> = {
+    planning: "claude-opus-4-6",
+    dev: "claude-sonnet-4-5",
+    test_design: "claude-sonnet-4-5",
+    test_run: "claude-haiku-4-5",
+    acceptance: "claude-sonnet-4-5",
+    delivery: "claude-haiku-4-5",
+  };
+  return map[stage] ?? "claude-sonnet-4-5";
+}
+
 export class ClaudeEngine implements ExecutionEngine {
   readonly name = "claude" as const;
   private mock = new MockEngine();
@@ -111,7 +139,7 @@ export class ClaudeEngine implements ExecutionEngine {
   }
 
   async runStage(ctx: StageContext): Promise<StageOutput> {
-    const model = this.modelFor(ctx.stageType);
+    const model = pickStageModel(ctx.modelKey, ctx.modelSource, this.cfg.model, env.anthropicModel, ctx.stageType);
     const memoryBlock = ctx.injections.length ? ctx.injections.join("\n") : "（无前序记忆）";
 
     if (ctx.stageType === "planning" && needsSelection(ctx.requirement.title) && !ctx.confirmAnswer) {

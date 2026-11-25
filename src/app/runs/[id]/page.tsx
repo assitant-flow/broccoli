@@ -495,7 +495,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                     <span className="cn-name">{STAGE_NAMES[t]}</span>
                     <span className={`cn-chip ${chip.cls}`}>{chip.label}</span>
                   </div>
-                  <span className="cn-model"><I name="i-zap" size={10} />{s.modelKey ?? "—"} · {s.modelSource === "override" ? "临时覆盖" : s.modelSource === "custom" ? "自定义" : "推荐"}</span>
+                  <span className="cn-model"><I name="i-zap" size={10} />{s.modelKey ?? "—"} · {s.modelSource === "override" ? "批次覆盖" : s.modelSource === "custom" ? "自定义" : s.modelSource === "default" ? "账号默认" : "推荐"}</span>
                   <div className="cn-meta">
                     耗时 {fmtDuration(s.startedAt, s.endedAt)}
                     {t === "dev" && run && run.repairRound > 0 ? ` · 修复轮次 ${run.repairRound}` : ""}
@@ -551,7 +551,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                       >
                         {["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"].map((m) => <option key={m} value={m} style={{ background: "#0b0e0c" }}>{m}</option>)}
                       </select>
-                      <span className="v" style={{ marginLeft: 4 }}>{selStage.modelSource === "override" ? "临时覆盖" : selStage.modelSource === "custom" ? "自定义" : "推荐"}</span>
+                      <span className="v" style={{ marginLeft: 4 }}>{selStage.modelSource === "override" ? "批次覆盖" : selStage.modelSource === "custom" ? "自定义" : selStage.modelSource === "default" ? "账号默认" : "推荐"}</span>
                     </div>
                     <div className="sg-kv">耗时<span className="v">{fmtDuration(selStage.startedAt, selStage.endedAt)}</span></div>
                     <div className="sg-kv">开始<span className="v">{selStage.startedAt ? new Date(selStage.startedAt).toLocaleTimeString("zh-CN") : "—"}</span></div>

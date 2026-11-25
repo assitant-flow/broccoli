@@ -226,22 +226,29 @@ export async function startQueuedRuns(): Promise<number> {
       continue;
     }
 
-    // 创建 6 个阶段实例（模型解析落库，FR-D10/D17；批次临时覆盖优先，FR-D18）
+    // 创建 6 个阶段实例（模型解析落库，FR-D10/D17；批次临时覆盖优先，FR-D18）。
+    // 生效模型 = 批次覆盖 > 项目阶段自定义 > 账号接入默认（/settings/ai）> 推荐档位；
+    // 引擎 pickStageModel 与此处同序，落库值即真实调用模型（展示不撒谎）
     const models = await resolveStageModels(project.id);
     let batchOverrides: Record<string, string> = {};
     if (requirement.batchId) {
       const [batch] = await db.select().from(requirementBatches).where(eq(requirementBatches.id, requirement.batchId)).limit(1);
       batchOverrides = batch?.stageModelOverrides ?? {};
     }
+    const { loadUserAiSettings } = await import("@/lib/ai-settings");
+    const accountModel = (await loadUserAiSettings(project.userId))?.model ?? env.anthropicModel ?? "";
     await db.insert(taskStages).values(
-      STAGE_TYPES.map((t, i) => ({
-        runId: run.id,
-        type: t,
-        seq: i,
-        state: "queued" as const,
-        modelKey: batchOverrides[t] ?? models[t].key,
-        modelSource: batchOverrides[t] ? "override" : models[t].source,
-      })),
+      STAGE_TYPES.map((t, i) => {
+        if (batchOverrides[t]) {
+          return { runId: run.id, type: t, seq: i, state: "queued" as const, modelKey: batchOverrides[t], modelSource: "override" };
+        }
+        if (models[t].source === "custom") {
+          return { runId: run.id, type: t, seq: i, state: "queued" as const, modelKey: models[t].key, modelSource: "custom" };
+        }
+        return accountModel
+          ? { runId: run.id, type: t, seq: i, state: "queued" as const, modelKey: accountModel, modelSource: "default" }
+          : { runId: run.id, type: t, seq: i, state: "queued" as const, modelKey: models[t].key, modelSource: "recommended" };
+      }),
     );
 
     // 记忆注入（FR-G1/G3/G10 + v2β 检索优化 FR-G11）：已确认记忆 + 待确认提案 + 用户偏好
@@ -381,6 +388,8 @@ function buildCtx(
     subtasks: subs.map((s) => ({ seq: s.seq, title: s.title, state: s.state })),
     criteria: criteria.map((c) => ({ seq: c.seq, content: c.content, verifyStage: c.verifyStage, status: c.status })),
     nextPrNumber,
+    modelKey: stage.modelKey,
+    modelSource: stage.modelSource,
   };
 }
 
@@ -415,7 +424,8 @@ async function driveStage(runId: string, stageId: string): Promise<void> {
   const ctx = buildCtx(run, stage, requirement, project, subs, criteria, prCount + 1, userMsgs.map((m) => m.text));
   const startedAt = Date.now();
 
-  await logLine(runId, stageId, "info", `▶ ${stage.type} 启动 · 模型 ${stage.modelKey}（${stage.modelSource === "custom" ? "自定义" : "推荐"}）${run.repairRound > 0 ? ` · 修复轮次 ${run.repairRound}` : ""}`);
+  const SOURCE_LABEL: Record<string, string> = { override: "批次覆盖", custom: "自定义", default: "账号默认", recommended: "推荐" };
+  await logLine(runId, stageId, "info", `▶ ${stage.type} 启动 · 模型 ${stage.modelKey}（${SOURCE_LABEL[stage.modelSource ?? "recommended"] ?? stage.modelSource}）${run.repairRound > 0 ? ` · 修复轮次 ${run.repairRound}` : ""}`);
 
   try {
     const output = await engine.runStage(ctx);

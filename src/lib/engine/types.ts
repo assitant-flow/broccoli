@@ -22,6 +22,9 @@ export interface StageContext {
   subtasks: { seq: number; title: string; state: string }[];
   criteria: { seq: number; content: string; verifyStage: string; status: string }[];
   nextPrNumber: number;
+  /** 本阶段配置的模型（项目阶段配置 / 批次临时覆盖落库值）与来源 */
+  modelKey?: string | null;
+  modelSource?: string | null;
 }
 
 export interface StageArtifactOut {
