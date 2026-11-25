@@ -20,7 +20,8 @@ export function workPath(projectId: string) {
   return path.join(projectRepoDir(projectId), "work");
 }
 
-async function git(cwd: string, ...args: string[]): Promise<string> {
+/** 低层 git 调用（返回 stdout）；供 git.ts 内部与少数需要读取仓库状态的路由使用 */
+export async function git(cwd: string, ...args: string[]): Promise<string> {
   const { stdout } = await run("git", args, { cwd, maxBuffer: 1024 * 1024 * 16 });
   return stdout.trim();
 }
@@ -35,7 +36,7 @@ function authArgs(token?: string): string[] {
 }
 
 /** 网络型 git 命令：禁用交互提示（防挂起）+ 超时 + 失败重试一次 */
-async function gitNet(cwd: string, token: string | undefined, args: string[], timeoutMs = 180000): Promise<void> {
+export async function gitNet(cwd: string, token: string | undefined, args: string[], timeoutMs = 180000): Promise<void> {
   const attempt = () =>
     run("git", [...authArgs(token), ...args], {
       cwd,
@@ -87,17 +88,20 @@ export async function ensureProjectRepos(projectId: string, seedFiles: Record<st
     await git(work, "clone", origin, ".");
     // 仓库级身份必须先于任何 commit（CI runner / 容器无全局 git 身份）
     await ensureIdentity(work);
-    // 调度器重建工作区时 seedFiles 为空：只建环境，不产生空提交（修复 compose 下 commit 空树失败）
-    if (Object.keys(seedFiles).length > 0) {
-      for (const [rel, content] of Object.entries(seedFiles)) {
-        const p = path.join(work, rel);
-        await fs.mkdir(path.dirname(p), { recursive: true });
-        await fs.writeFile(p, content);
-      }
-      await git(work, "add", "-A");
-      const committed = await commitAll(projectId, "chore: 初始化项目骨架");
-      if (committed) await git(work, "push", "origin", "main");
+    // 调度器重建工作区时 seedFiles 为空：用占位 README 引导出真实的 main 初始提交。
+    // 不能省略——裸仓库若无 main，后续 checkout -B <branch> main 会因「unborn branch」失败，
+    // 写回等依赖 origin main 的操作也无法进行（数据卷丢失后重建的场景）
+    const effective = Object.keys(seedFiles).length > 0
+      ? seedFiles
+      : { "README.md": "# 项目工作区\n\n由 Broccoli 重建（原始种子文件缺失）。队列任务会在此目录上继续交付。\n" };
+    for (const [rel, content] of Object.entries(effective)) {
+      const p = path.join(work, rel);
+      await fs.mkdir(path.dirname(p), { recursive: true });
+      await fs.writeFile(p, content);
     }
+    await git(work, "add", "-A");
+    const committed = await commitAll(projectId, "chore: 初始化项目骨架");
+    if (committed) await git(work, "push", "origin", "main");
   }
 }
 

@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   // Token 解析优先级：请求显式 secret → 用户接入设置（app_settings）→ 旧 credentials → 平台 env
   let key = secret?.trim() ?? "";
   if (!key) key = (await getUserAiToken(user.id)) ?? "";
-  if (!key && provider === "anthropic") key = env.anthropicAuthToken ?? "";
+  if (!key && provider === "anthropic" && env.sharedCredentials) key = env.anthropicAuthToken ?? "";
   if (!key) {
     const [cred] = await db
       .select()

@@ -140,6 +140,7 @@ Broccoli 为每个项目（以及每个用户）维护持久化的记忆：
 | [docs/requirements.md](docs/requirements.md) | 需求文档（PRD）：功能需求 + 验收标准 + 非功能需求 |
 | [docs/design.md](docs/design.md) | 技术设计：架构、数据模型、状态机、核心流程、安全 |
 | [docs/DEV.md](docs/DEV.md) | **实现状态与运行指南**（MVP P0 已全部实现，含离线演示模式） |
+| [docs/DEPLOY-PUBLIC.md](docs/DEPLOY-PUBLIC.md) | 公网部署指南（生产编排 / Caddy 自动 HTTPS / 安全基线 / 备份恢复，feat/public-deploy 分支） |
 | [docs/ui/](docs/ui/) | 7 张高保真 UI 设计稿 + HTML 源稿 |
 
 ## 实现状态

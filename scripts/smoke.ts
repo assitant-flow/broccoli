@@ -4,9 +4,10 @@
  * 运行：pnpm smoke
  */
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 
-const BASE = "http://localhost:3000";
+const BASE = process.env.BROCCOLI_BASE ?? "http://localhost:3000";
 let cookie = "";
 let failures = 0;
 
@@ -269,11 +270,21 @@ async function main() {
 
   // 21. 记忆写回仓库（FR-G9 后半）：确认记忆 → CLAUDE.md → 提交 main
   await http(`/api/projects/${projB.id}/memories`, "POST", {}); // 批量确认 B 的提案
-  const wb = await http<{ ok: boolean; message: string }>(`/api/projects/${projB.id}/memories/write-back`, "POST");
+  const wb = await http<{ ok: boolean; message: string; commit?: string; branch?: string }>(`/api/projects/${projB.id}/memories/write-back`, "POST");
   check("记忆写回仓库 CLAUDE.md（FR-G9）", wb.data.ok === true, wb.data.message);
   const bProjId = projB.id;
-  const claudeMd = (() => { try { return fs.readFileSync(path.join(process.cwd(), ".data", "repos", bProjId, "work", "CLAUDE.md"), "utf8"); } catch { return ""; } })();
-  check("写回内容真实落库（CLAUDE.md in origin main）", claudeMd.includes("Broccoli 记忆写回"));
+  // origin 落库核验：宿主可读仓库时直接验证 origin（本地/CI 拓扑）；
+  // 仓库在容器卷内时以 API 返回的 commit 证据为准（公网预演另由 verify-public 以 docker exec 兜底）
+  let originState = "unreachable";
+  try {
+    const originMd = execFileSync("git", ["--git-dir", path.join(process.cwd(), ".data", "repos", bProjId, "origin.git"), "show", `${wb.data.branch ?? "main"}:CLAUDE.md`], { encoding: "utf8" });
+    originState = originMd.includes("Broccoli 记忆写回") ? "origin-ok" : "origin-missing";
+  } catch { /* 容器卷拓扑：宿主不可读 */ }
+  check(
+    "写回内容真实落库（commit 证据；origin 可达时直接核验）",
+    /^[0-9a-f]{7,40}$/i.test(wb.data.commit ?? "") && originState !== "origin-missing",
+    `commit=${wb.data.commit ?? "none"} origin=${originState}`,
+  );
 
   // 22. 用户级偏好记忆（v2α FR-G10）：跨项目注入
   await http("/api/user/preferences", "POST", { content: "跨项目偏好：commit 信息使用中文" });

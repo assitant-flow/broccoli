@@ -20,7 +20,7 @@ export async function getEngine(userId: string): Promise<ExecutionEngine> {
     const userAi = await loadUserAiSettings(userId);
     if (userAi) return new ClaudeEngine(userAi);
     // ② 平台级 env token
-    if (env.anthropicAuthToken) return new ClaudeEngine({ key: env.anthropicAuthToken });
+    if (env.sharedCredentials && env.anthropicAuthToken) return new ClaudeEngine({ key: env.anthropicAuthToken });
     // ③ 旧 BYO key（credentials provider=anthropic）
     const [cred] = await db
       .select()

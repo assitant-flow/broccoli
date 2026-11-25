@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { credentials, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { signSession, encryptSecret, hashPassword } from "@/lib/crypto";
-import { SESSION_COOKIE } from "@/lib/auth";
+import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { cookies } from "next/headers";
 
@@ -65,6 +65,7 @@ export async function GET(req: Request) {
   // find-or-create 用户（OAuth 用户无密码登录，随机占位 hash）
   let [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (!user) {
+    if (env.registration !== "open") return fail("注册已关闭，请联系管理员开通账号");
     [user] = await db
       .insert(users)
       .values({ email, passwordHash: hashPassword(crypto.randomUUID()), displayName: ghUser.name || ghUser.login })
@@ -86,7 +87,7 @@ export async function GET(req: Request) {
   }
 
   // 会话
-  store.set(SESSION_COOKIE, signSession({ uid: user.id }), { httpOnly: true, path: "/", sameSite: "lax", maxAge: 604800 });
+  store.set(SESSION_COOKIE, signSession({ uid: user.id }), sessionCookieOptions());
   store.set("broccoli_oauth_state", "", { httpOnly: true, path: "/", maxAge: 0 });
   return Response.redirect(`${env.siteUrl}/`, 302);
 }

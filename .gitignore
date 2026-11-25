@@ -6,3 +6,7 @@ node_modules/
 .DS_Store
 .zcode/
 .video_agent/
+
+# 公网部署：密钥与备份不入库
+.env.production
+backups/

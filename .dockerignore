@@ -1,0 +1,14 @@
+# 构建上下文排除：宿主机依赖（平台相关二进制）、运行数据、密钥与文档
+node_modules
+.next
+.data
+.git
+.env
+.env.*
+!.env.example
+.zcode
+.video_agent
+docs
+backups
+*.log
+*.tsbuildinfo

@@ -1,3 +1,5 @@
+import { resolveMode, resolveRegistration, resolveSeedDemo, resolveSharedCredentials } from "./prod-config";
+
 export const env = {
   databaseUrl: process.env.DATABASE_URL ?? "postgres://broccoli:broccoli@localhost:5432/broccoli",
   sessionSecret: process.env.SESSION_SECRET ?? "dev-session-secret",
@@ -29,6 +31,14 @@ export const env = {
   /** 验收回路最大自动修复轮数（FR-D14，默认 1） */
   maxRepairRounds: Number(process.env.BROCCOLI_MAX_REPAIR_ROUNDS ?? 1),
   siteUrl: process.env.BROCCOLI_SITE_URL ?? "http://localhost:3000",
+  /** 部署模式：local（开发/自用，宽松）| public（公网，启动守卫严格校验） */
+  mode: resolveMode(process.env),
+  /** 演示账号种子（固定口令，公网默认关闭） */
+  seedDemo: resolveSeedDemo(process.env),
+  /** 注册策略：公网默认 closed（由管理员用 pnpm user:create 开通） */
+  registration: resolveRegistration(process.env),
+  /** 平台共享凭证（ANTHROPIC_AUTH_TOKEN / GITHUB_TOKEN 对所有账号可用）：公网默认关闭 */
+  sharedCredentials: resolveSharedCredentials(process.env),
 };
 
 export const STAGE_TYPES = ["planning", "dev", "test_design", "test_run", "acceptance", "delivery"] as const;

@@ -2,7 +2,8 @@ import { db } from "@/db";
 import { auditLogs, memoryItems, projects, taskRuns } from "@/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getSessionUser } from "@/lib/auth";
-import { commitAll, pushBranch, workPath } from "@/lib/git";
+import { commitAll, ensureProjectRepos, git, gitNet, pushBranch, workPath } from "@/lib/git";
+import { resolveGithubToken } from "@/lib/github";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -38,15 +39,28 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     ...items.map((i) => `- [${TYPE_LABEL[i.type] ?? i.type}] ${i.content}`),
   ].join("\n");
 
-  await fs.writeFile(path.join(workPath(project.id), "CLAUDE.md"), md);
+  // 写回必须落在默认分支：流水线结束后工作区通常停留在最后一次执行的 broccoli/* 分支，
+  // 直接 commit 会把 CLAUDE.md 提交到特性分支，随后「推送 main」成为静默 no-op（历史缺陷）。
+  const work = workPath(project.id);
+  const branch = project.defaultBranch;
+  const token = (project.originKind === "github" ? await resolveGithubToken(user.id) : undefined) ?? undefined;
+  if (project.originKind !== "github") await ensureProjectRepos(project.id, {}, undefined);
+  // 显式按分支名 fetch 并以 FETCH_HEAD 为基：克隆自空裸仓库的工作区可能没有
+  // refs/remotes/origin/* 追踪引用（无 fetch refspec），origin/main 不可解析
+  await gitNet(work, token, ["fetch", "origin", branch], 60000);
+  await git(work, "checkout", "-B", branch, "FETCH_HEAD");
+
+  await fs.writeFile(path.join(work, "CLAUDE.md"), md);
   const committed = await commitAll(project.id, "chore: Broccoli 记忆写回（CLAUDE.md，FR-G9）");
   if (!committed) return Response.json({ ok: false, message: "写回内容与仓库现状一致，无变更" }, { status: 400 });
-  await pushBranch(project.id, "main");
+  await pushBranch(project.id, branch, { token });
+  const commit = await git(work, "rev-parse", "--short", "HEAD");
+
   await db.insert(auditLogs).values({
     actor: "user",
     action: "memory_write_back",
     target: `project:${id}`,
-    detail: { count: items.length },
+    detail: { count: items.length, branch, commit },
   });
-  return Response.json({ ok: true, message: `已写回 ${items.length} 条记忆到 CLAUDE.md 并推送到 main` });
+  return Response.json({ ok: true, message: `已写回 ${items.length} 条记忆到 CLAUDE.md 并推送到 ${branch}`, commit, branch });
 }

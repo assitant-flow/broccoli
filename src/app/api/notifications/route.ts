@@ -12,6 +12,7 @@ export async function GET() {
     .select({
       id: notificationEvents.id,
       type: notificationEvents.type,
+      dedupeKey: notificationEvents.dedupeKey,
       runId: notificationEvents.runId,
       createdAt: notificationEvents.createdAt,
       reqTitle: requirements.title,

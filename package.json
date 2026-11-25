@@ -15,7 +15,9 @@
     "verify:sandbox": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-sandbox.ts",
     "test:unit": "tsx --test tests/unit/*.test.ts",
     "verify:retrieval": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-retrieval.ts",
-    "verify:services": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-services.ts"
+    "verify:services": "DATABASE_URL=postgres://broccoli:broccoli@localhost:5432/broccoli tsx scripts/verify-services.ts",
+    "check:prod": "tsx scripts/check-prod.ts",
+    "user:create": "tsx scripts/create-user.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.0",

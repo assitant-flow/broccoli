@@ -10,7 +10,7 @@ import { env } from "./env";
  */
 
 export async function resolveGithubToken(userId: string): Promise<string | null> {
-  if (env.githubToken) return env.githubToken;
+  if (env.sharedCredentials && env.githubToken) return env.githubToken;
   const [cred] = await db
     .select()
     .from(credentials)

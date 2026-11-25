@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   // CSRF state：随机值写入短命 cookie，回调时比对
   const state = crypto.randomBytes(16).toString("hex");
   const store = await cookies();
-  store.set("broccoli_oauth_state", state, { httpOnly: true, path: "/", sameSite: "lax", maxAge: 600 });
+  store.set("broccoli_oauth_state", state, { httpOnly: true, path: "/", sameSite: "lax", secure: env.siteUrl.startsWith("https://"), maxAge: 600 });
 
   const redirectUri = `${env.siteUrl.replace(/\/$/, "")}/api/auth/github/callback`;
   // repo（仓库读写，github origin 项目使用）+ read:user/user:email（账号识别）

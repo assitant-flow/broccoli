@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { workPath } from "@/lib/git";
 import type { Sandbox } from "./types";
+import { buildSandboxEnv } from "./safe-env";
 
 const run = promisify(execFile);
 
@@ -19,6 +20,7 @@ export class LocalSandbox implements Sandbox {
     try {
       const res = await run(args[0], args.slice(1), {
         cwd,
+        env: buildSandboxEnv(process.env), // 白名单环境：不泄露数据库连接串与主密钥
         maxBuffer: 1024 * 1024 * 8,
         timeout: opts?.timeoutMs ?? 120000,
         shell: true, // 支持 glob（node --test "tests/*.test.mjs"）

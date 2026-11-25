@@ -25,9 +25,9 @@ export async function GET() {
     baseUrl: saved?.baseUrl ?? env.anthropicBaseUrl,
     model: saved?.model ?? env.anthropicModel,
     tokenHint: saved?.tokenHint ?? null,
-    hasToken: !!saved?.tokenCipher || !!env.anthropicAuthToken,
+    hasToken: !!saved?.tokenCipher || (env.sharedCredentials && !!env.anthropicAuthToken),
     engine: env.engine,
-    source: saved ? "user" : env.anthropicAuthToken ? "platform-env" : "credentials-or-mock",
+    source: saved ? "user" : env.sharedCredentials && env.anthropicAuthToken ? "platform-env" : "credentials-or-mock",
   });
 }
 

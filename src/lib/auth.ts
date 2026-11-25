@@ -3,8 +3,14 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifySession } from "./crypto";
+import { env } from "./env";
 
 export const SESSION_COOKIE = "broccoli_session";
+
+/** 会话 Cookie 选项：站点为 https 时强制 Secure（本地 http 预演不设，否则浏览器不回传） */
+export function sessionCookieOptions(maxAge = 60 * 60 * 24 * 7) {
+  return { httpOnly: true, path: "/", sameSite: "lax" as const, secure: env.siteUrl.startsWith("https://"), maxAge };
+}
 
 export type SessionUser = { id: string; email: string; displayName: string };
 

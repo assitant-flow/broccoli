@@ -31,6 +31,11 @@ services:
       BROCCOLI_ENGINE: ${BROCCOLI_ENGINE:-mock}
       BROCCOLI_DATA_DIR: /app/.data
       BROCCOLI_SITE_URL: ${BROCCOLI_SITE_URL:-http://localhost:3000}
+      # 本地模式（开发/自用）：保持宽松默认；公网请用 docker-compose.prod.yml
+      BROCCOLI_MODE: local
+      BROCCOLI_SEED_DEMO: ${BROCCOLI_SEED_DEMO:-1}
+      BROCCOLI_REGISTRATION: ${BROCCOLI_REGISTRATION:-open}
+      BROCCOLI_SHARED_CREDENTIALS: ${BROCCOLI_SHARED_CREDENTIALS:-1}
       # LLM router 在宿主机时，容器内需用 host.docker.internal 访问
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-http://host.docker.internal:1980}
       ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:-}
@@ -42,6 +47,8 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "3000:3000"
+      # AI 项目交付阶段启动的服务（services.ts 从 3930 起分配端口）
+      - "3930-3990:3930-3990"
     volumes:
       - broccoli-data:/app/.data
     healthcheck:

@@ -1,0 +1,26 @@
+# Caddy 反向代理（自动 HTTPS）。站点地址由 BROCCOLI_DOMAIN 注入：
+#   公网：broccoli.example.com（自动申请 Let's Encrypt 证书，需 80/443 可从公网访问）
+#   本地预演：http://:80（仅 HTTP，不申请证书）
+{$BROCCOLI_DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	request_body {
+		max_size 1MB
+	}
+
+	# 执行画布实时流（SSE）：不压缩、立即刷新，避免事件被缓冲
+	@stream path /api/runs/*/stream
+	handle @stream {
+		reverse_proxy app:3000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		encode zstd gzip
+		reverse_proxy app:3000
+	}
+}
